@@ -1,0 +1,26 @@
+# Frontend
+frontend/node_modules/
+frontend/.env
+frontend/build/
+frontend/dist/
+frontend/.cache/
+
+# Backend
+backend/__pycache__/
+backend/*.pyc
+backend/.env
+backend/venv/
+backend/.pytest_cache/
+backend/app/__pycache__/
+
+# IDE files
+.vscode/
+.idea/
+*.swp 
+__pycache__/
+
+# Cursor
+.cursor/
+
+PRD.md
+project_structure.md
