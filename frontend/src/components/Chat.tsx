@@ -1,14 +1,38 @@
-import React, { useState } from 'react';
-import { Message } from '../types';
+import React, { useState, useEffect } from 'react';
+import { Message, Conversation } from '../types';
 
 interface ChatProps {
-    chatId: string;
+    chatId: string | null;
+    onConversationUpdate: (conversation: Conversation) => void;
 }
 
-export const Chat: React.FC<ChatProps> = ({ chatId }) => {
+export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate }) => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+
+    const fetchMessages = async () => {
+        if (!chatId) {
+            setMessages([]);
+            return;
+        }
+
+        try {
+            const response = await fetch(`http://localhost:8000/api/chat/${chatId}/messages`);
+            if (!response.ok) {
+                throw new Error('Failed to fetch messages');
+            }
+            const data = await response.json();
+            setMessages(data);
+        } catch (error) {
+            console.error('Error fetching messages:', error);
+        }
+    };
+
+    useEffect(() => {
+        setMessages([]); // Clear messages when chatId changes
+        fetchMessages();
+    }, [chatId]);
 
     const sendMessage = async (content: string) => {
         if (!content.trim()) return;
@@ -25,12 +49,17 @@ export const Chat: React.FC<ChatProps> = ({ chatId }) => {
         setIsLoading(true);
 
         try {
+            const payload = {
+                message: content,
+                chat_id: chatId ? parseInt(chatId) : undefined
+            };
+
             const response = await fetch('http://localhost:8000/api/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ message: content, chat_id: chatId }),
+                body: JSON.stringify(payload),
             });
 
             const data = await response.json();
@@ -43,6 +72,11 @@ export const Chat: React.FC<ChatProps> = ({ chatId }) => {
                 timestamp: new Date().toISOString()
             };
             setMessages(prev => [...prev, assistantMessage]);
+
+            // Update conversation data
+            if (data.conversation) {
+                onConversationUpdate(data.conversation);
+            }
         } catch (error) {
             console.error('Error sending message:', error);
             // You might want to show an error message to the user here
@@ -51,14 +85,14 @@ export const Chat: React.FC<ChatProps> = ({ chatId }) => {
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        sendMessage(input);
-    };
-
     return (
-        <div className="flex justify-center items-center min-h-screen bg-gray-50 p-4">
-            <div className="w-full max-w-3xl bg-white rounded-lg shadow-lg flex flex-col h-[80vh]">
+        <div className="h-full">
+            <div className="mb-4">
+                <h2 className="text-xl font-semibold">
+                    {chatId ? `Chat ${chatId}` : 'New Chat'}
+                </h2>
+            </div>
+            <div className="space-y-4">
                 {/* Chat messages */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
                     {messages.map((message) => (
@@ -80,7 +114,10 @@ export const Chat: React.FC<ChatProps> = ({ chatId }) => {
                 </div>
 
                 {/* Input area */}
-                <form onSubmit={handleSubmit} className="p-4 border-t">
+                <form onSubmit={(e) => {
+                    e.preventDefault();
+                    sendMessage(input);
+                }} className="p-4 border-t">
                     <div className="flex space-x-4">
                         <input
                             type="text"

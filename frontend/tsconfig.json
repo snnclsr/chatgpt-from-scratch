@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+        "allowJs": true,
+        "jsx": "react",
+        "moduleResolution": "node",
+        "resolveJsonModule": true,
+        "esModuleInterop": true,
+        "target": "es2015",
+        "lib": [
+            "dom",
+            "es2015"
+        ]
+    }
+}

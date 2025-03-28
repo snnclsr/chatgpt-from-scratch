@@ -3,4 +3,11 @@ export interface Message {
     content: string;
     role: 'user' | 'assistant';
     timestamp: string;
+}
+
+export interface Conversation {
+    id: number;
+    title: string;
+    created_at: string;
+    preview: string | null;
 } 
