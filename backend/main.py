@@ -1,15 +1,23 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app.api.routes import router
-from app.core.config import settings
 from app.database import SessionLocal, engine
 from app import models
-from app.schemas import ChatInput, ChatResponse, ConversationResponse, HealthResponse
+from app.schemas import (
+    ChatInput,
+    ChatResponse,
+    ConversationResponse,
+    HealthResponse,
+    StreamingChatInput,
+)
 from app.services.chat_service import ChatService
 from app.services.conversation_service import ConversationService
 from app.services.message_service import MessageService
 from app.services.user_service import UserService
+from app.services.llm_service import LLMService
+import logging
 
 # Create database tables
 models.Base.metadata.create_all(bind=engine)
@@ -37,23 +45,102 @@ def get_db():
 
 app.include_router(router)
 
-# Placeholder responses
-LOREM_RESPONSES = [
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-    "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
-    "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.",
-    "Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
-]
 
-
-@app.post("/api/chat", response_model=ChatResponse)
-async def chat(message: ChatInput, db: Session = Depends(get_db)):
-    """Chat endpoint that processes messages using the chat service"""
+@app.post(
+    "/api/chat/stream",
+    description="""
+    Streaming chat endpoint that returns tokens one by one as they are generated.
+    
+    This endpoint follows the Server-Sent Events (SSE) protocol. Each token is sent 
+    as a separate 'data:' message. The stream ends with 'data: [DONE]'.
+    
+    The response from the LLM will be streamed token by token, allowing for a more 
+    interactive experience. After the streaming is complete, the full response is 
+    stored in the database.
+    
+    The streaming parameters (max_length, temperature, top_p) are optional and have 
+    reasonable defaults.
+    
+    Client disconnection (e.g., CTRL+C) is handled gracefully. If the stream is interrupted,
+    the partial response is NOT saved to the database.
+    """,
+)
+async def chat_stream(message: StreamingChatInput, db: Session = Depends(get_db)):
+    """Streaming chat endpoint that returns tokens one by one"""
     try:
         chat_service = ChatService(db)
-        return await chat_service.process_chat_message(
-            message=message.message, chat_id=message.chat_id
+        user_service = UserService(db)
+        conversation_service = ConversationService(db)
+        message_service = MessageService(db)
+        llm_service = LLMService()
+
+        # Get or create user
+        user = user_service.get_or_create_default_user()
+
+        # Get existing conversation or create new one
+        if message.chat_id:
+            conversation = conversation_service.get_conversation(message.chat_id)
+            if not conversation:
+                raise ValueError("Conversation not found")
+        else:
+            conversation = conversation_service.create_conversation(
+                user.id, message.message
+            )
+
+        # Store user message
+        message_service.create_message(
+            content=message.message, role="user", conversation_id=conversation.id
         )
+
+        # Get conversation history for context
+        previous_messages = message_service.get_conversation_messages(conversation.id)
+
+        # Format the prompt including conversation history
+        formatted_prompt = chat_service._format_conversation_for_model(
+            previous_messages
+        )
+
+        # Create a streaming response
+        async def stream_generator():
+            full_response = ""
+            stream_completed = False
+
+            try:
+                async for token in llm_service.generate_stream(
+                    prompt=formatted_prompt,
+                    max_length=message.max_length,
+                    temperature=message.temperature,
+                    top_p=message.top_p,
+                ):
+                    if token.startswith("Error:"):
+                        yield f"data: {token}\n\n"
+                        break
+                    full_response += token
+                    yield f"data: {token}\n\n"
+
+                # Mark stream as successfully completed
+                stream_completed = True
+                yield "data: [DONE]\n\n"
+
+                # Only save the response if streaming completed successfully
+                if stream_completed:
+                    message_service.create_message(
+                        content=full_response,
+                        role="assistant",
+                        conversation_id=conversation.id,
+                    )
+            except Exception as e:
+                # Log any errors during streaming
+                logging.error(f"Error during streaming: {str(e)}")
+            finally:
+                if not stream_completed:
+                    # Log that the connection was terminated
+                    logging.info(
+                        f"Streaming connection terminated for conversation {conversation.id}. Response not saved."
+                    )
+
+        return StreamingResponse(stream_generator(), media_type="text/event-stream")
+
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:

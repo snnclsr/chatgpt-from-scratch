@@ -1,23 +1,233 @@
-from typing import AsyncGenerator
+import time
+import logging
+import os
+from typing import AsyncGenerator, Dict, Any
+
 import torch
-import asyncio
+import tiktoken
+from .gpt_model import GPTModel
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+def text_to_token_ids(text, tokenizer):
+    encoded = tokenizer.encode(text)
+    encoded_tensor = torch.tensor(encoded).unsqueeze(0)  # add batch dimension
+    return encoded_tensor
+
+
+def token_ids_to_text(token_ids, tokenizer):
+    flat = token_ids.squeeze(0)  # remove batch dimension
+    return tokenizer.decode(flat.tolist())
 
 
 class ModelInterface:
     def __init__(self):
+        """Initialize the model interface and load the model"""
+        logger.info("Initializing model interface")
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        # Model loading will be implemented later
-        self.model = None
-        self.tokenizer = None
+        logger.info(f"Using device: {self.device}")
+
+        # Load model - this will be done once at startup
+        self._load_model()
+
+    def _load_model(self) -> None:
+        """Load the GPT model and tokenizer"""
+        try:
+            start_time = time.time()
+
+            # Initialize tokenizer
+            self.tokenizer = tiktoken.get_encoding("gpt2")
+
+            self.BASE_CONFIG = {
+                "vocab_size": 50257,  # Vocabulary size
+                "context_length": 1024,  # Context length
+                "drop_rate": 0.0,  # Dropout rate
+                "qkv_bias": True,  # Query-key-value bias
+            }
+
+            model_configs = {
+                "gpt2-small (124M)": {"emb_dim": 768, "n_layers": 12, "n_heads": 12},
+                "gpt2-medium (355M)": {"emb_dim": 1024, "n_layers": 24, "n_heads": 16},
+                "gpt2-large (774M)": {"emb_dim": 1280, "n_layers": 36, "n_heads": 20},
+                "gpt2-xl (1558M)": {"emb_dim": 1600, "n_layers": 48, "n_heads": 25},
+            }
+
+            # Look for model in different locations (local development vs docker)
+            model_filename = "gpt2-small-124M.pth"
+
+            # Check current directory first
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            local_path = os.path.join(current_dir, model_filename)
+
+            # Check models directory (for Docker)
+            models_dir = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(current_dir))), "models"
+            )
+            docker_path = os.path.join(models_dir, model_filename)
+
+            # Try different paths
+            if os.path.exists(local_path):
+                file_path = local_path
+                logger.info(f"Loading model from local directory: {file_path}")
+            elif os.path.exists(docker_path):
+                file_path = docker_path
+                logger.info(f"Loading model from models volume: {file_path}")
+            else:
+                # Fallback to just the filename (current directory)
+                file_path = model_filename
+                logger.info(
+                    f"Attempting to load model from current directory: {file_path}"
+                )
+
+            CHOOSE_MODEL = "gpt2-small (124M)"
+            self.BASE_CONFIG.update(model_configs[CHOOSE_MODEL])
+
+            self.model = GPTModel(self.BASE_CONFIG)
+            self.model.load_state_dict(torch.load(file_path, weights_only=True))
+            self.model.eval()
+            self.model.to(self.device)
+
+            load_time = time.time() - start_time
+            logger.info(f"Model loaded successfully in {load_time:.2f} seconds")
+        except Exception as e:
+            logger.error(f"Failed to load model: {str(e)}")
+            # Fallback to a simple model or raise error depending on requirements
+            self.model = None
+            self.tokenizer = None
+            raise
 
     async def generate_stream(
-        self, prompt: str, max_length: int = 100
+        self,
+        prompt: str,
+        max_length: int = 100,
+        temperature: float = 0.7,
+        top_k: int = None,
+        top_p: float = 0.9,
+        eos_id: int = None,
+        **kwargs: Dict[str, Any],
     ) -> AsyncGenerator[str, None]:
         """
-        Streaming interface for the model.
-        This will be implemented when we add the actual model.
+        Stream tokens from the model one by one.
+
+        Args:
+            prompt: The input prompt to generate from
+            max_length: Maximum number of tokens to generate
+            temperature: Sampling temperature (higher = more random)
+            top_p: Nucleus sampling parameter
+            kwargs: Additional parameters for the model
+
+        Yields:
+            Generated tokens one by one
         """
-        # Placeholder for now - will be replaced with actual model
-        for token in ["Hello", "world", "!..."]:
-            yield token
-            await asyncio.sleep(0.1)  # Simulate streaming
+        if not self.model or not self.tokenizer:
+            logger.error("Model or tokenizer not initialized")
+            yield "Error: Model not initialized properly."
+            return
+
+        try:
+            # Log inference start
+            start_time = time.time()
+            logger.info(f"Starting generation with prompt length: {len(prompt)}")
+
+            # Validate input length
+            if len(prompt) > 4000:  # Example limit
+                logger.warning(f"Prompt too long: {len(prompt)} chars")
+                yield "Error: Prompt too long. Please reduce length."
+                return
+
+            # Convert prompt to token IDs
+            idx = text_to_token_ids(prompt, self.tokenizer)
+
+            # Store original prompt length to track new tokens
+            original_length = idx.shape[1]
+            prev_idx_len = original_length
+
+            # For-loop is the same as before: Get logits, and only focus on last time step
+            for _ in range(max_length):
+                idx_cond = idx[:, -self.BASE_CONFIG["context_length"] :]
+                with torch.no_grad():
+                    logits = self.model(idx_cond)
+                logits = logits[:, -1, :]
+
+                # New: Filter logits with top_k sampling
+                if top_k is not None:
+                    # Keep only top_k values
+                    top_logits, _ = torch.topk(logits, top_k)
+                    min_val = top_logits[:, -1]
+                    logits = torch.where(
+                        logits < min_val,
+                        torch.tensor(float("-inf")).to(logits.device),
+                        logits,
+                    )
+
+                # New: Apply temperature scaling
+                if temperature > 0.0:
+                    logits = logits / temperature
+
+                    # Apply softmax to get probabilities
+                    probs = torch.softmax(logits, dim=-1)  # (batch_size, context_len)
+
+                    # Sample from the distribution
+                    idx_next = torch.multinomial(
+                        probs, num_samples=1
+                    )  # (batch_size, 1)
+
+                # Otherwise same as before: get idx of the vocab entry with the highest logits value
+                else:
+                    idx_next = torch.argmax(
+                        logits, dim=-1, keepdim=True
+                    )  # (batch_size, 1)
+
+                # Append sampled index to the running sequence
+                idx = torch.cat((idx, idx_next), dim=1)  # (batch_size, num_tokens+1)
+
+                # Decode just the new token and yield it
+                new_token = self.tokenizer.decode([idx_next.item()])
+                yield new_token
+
+                # Check if we hit the end token
+                if idx_next.item() == eos_id and eos_id is not None:
+                    break
+
+            # Log completion
+            total_time = time.time() - start_time
+            token_count = idx.shape[1] - original_length
+            logger.info(
+                f"Generation completed: {token_count} tokens in {total_time:.2f}s"
+            )
+            logger.info(f"Generation speed: {token_count / total_time:.2f} tokens/s")
+
+        except Exception as e:
+            logger.error(f"Error during generation: {str(e)}")
+            yield f"Error during generation: {str(e)}"
+
+    async def generate(
+        self,
+        prompt: str,
+        max_length: int = 100,
+        temperature: float = 0.7,
+        **kwargs: Dict[str, Any],
+    ) -> str:
+        """
+        Generate a complete response (non-streaming).
+
+        Args:
+            prompt: The input prompt
+            max_length: Maximum generation length
+            temperature: Sampling temperature
+            kwargs: Additional generation parameters
+
+        Returns:
+            The complete generated text
+        """
+        result = []
+        async for token in self.generate_stream(
+            prompt, max_length, temperature, **kwargs
+        ):
+            if token.startswith("Error:"):
+                return token
+            result.append(token)
+        return "".join(result)

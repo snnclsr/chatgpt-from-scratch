@@ -10,6 +10,18 @@ class ChatInput(BaseModel):
     )
 
 
+class StreamingChatInput(ChatInput):
+    max_length: Optional[int] = Field(
+        200, description="Maximum number of tokens to generate"
+    )
+    temperature: Optional[float] = Field(
+        0.7, description="Sampling temperature (0.0-1.0)"
+    )
+    top_p: Optional[float] = Field(
+        0.9, description="Nucleus sampling parameter (0.0-1.0)"
+    )
+
+
 class ConversationResponse(BaseModel):
     id: int
     title: str

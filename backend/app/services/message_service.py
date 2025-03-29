@@ -11,7 +11,9 @@ class MessageService:
     def create_message(self, content: str, role: str, conversation_id: int) -> Message:
         """Create a new message"""
         return self.repository.create(
-            content=content, role=role, conversation_id=conversation_id
+            content=content,
+            role=role,
+            conversation_id=conversation_id,
         )
 
     def get_conversation_messages(self, conversation_id: int) -> List[Message]:
