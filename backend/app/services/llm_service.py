@@ -33,7 +33,7 @@ class LLMService:
     async def generate_stream(
         self,
         prompt: str,
-        max_length: int = 100,
+        max_length: int = 20,
         temperature: float = 0.7,
         top_p: float = 0.9,
         **kwargs: Dict[str, Any],

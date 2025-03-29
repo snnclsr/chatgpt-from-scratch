@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -11,6 +11,7 @@ from app.schemas import (
     ConversationResponse,
     HealthResponse,
     StreamingChatInput,
+    WebSocketChatInput,
 )
 from app.services.chat_service import ChatService
 from app.services.conversation_service import ConversationService
@@ -18,6 +19,7 @@ from app.services.message_service import MessageService
 from app.services.user_service import UserService
 from app.services.llm_service import LLMService
 import logging
+import asyncio
 
 # Create database tables
 models.Base.metadata.create_all(bind=engine)
@@ -116,6 +118,7 @@ async def chat_stream(message: StreamingChatInput, db: Session = Depends(get_db)
                         yield f"data: {token}\n\n"
                         break
                     full_response += token
+                    logging.info(f"Streaming token: {token}")
                     yield f"data: {token}\n\n"
 
                 # Mark stream as successfully completed
@@ -175,3 +178,126 @@ async def get_conversations(db: Session = Depends(get_db)):
 async def health_check():
     """Health check endpoint"""
     return HealthResponse(status="ok")
+
+
+@app.websocket("/api/ws/chat")
+async def websocket_chat(websocket: WebSocket):
+    """WebSocket endpoint for bidirectional chat streaming"""
+    await websocket.accept()
+
+    # Keep track of the current generation task so we can cancel it
+    current_task = None
+
+    try:
+        db = SessionLocal()
+        chat_service = ChatService(db)
+        user_service = UserService(db)
+        conversation_service = ConversationService(db)
+        message_service = MessageService(db)
+        llm_service = LLMService()
+
+        # Get or create default user
+        user = user_service.get_or_create_default_user()
+
+        while True:
+            # Wait for client messages
+            data = await websocket.receive_json()
+            command = data.get("command", "")
+
+            if command == "generate":
+                # Start a new generation
+                message = WebSocketChatInput(**data)
+
+                # Get or create conversation
+                if message.chat_id:
+                    conversation = conversation_service.get_conversation(
+                        message.chat_id
+                    )
+                    if not conversation:
+                        await websocket.send_json({"error": "Conversation not found"})
+                        continue
+                else:
+                    conversation = conversation_service.create_conversation(
+                        user.id, message.message
+                    )
+
+                # Store user message
+                message_service.create_message(
+                    content=message.message,
+                    role="user",
+                    conversation_id=conversation.id,
+                )
+
+                # Get conversation history for context
+                previous_messages = message_service.get_conversation_messages(
+                    conversation.id
+                )
+
+                # Format the prompt including conversation history
+                formatted_prompt = chat_service._format_conversation_for_model(
+                    previous_messages
+                )
+                logging.info(f"Formatted prompt: {formatted_prompt}")
+                # Start token generation
+                full_response = ""
+
+                try:
+                    async for token in llm_service.generate_stream(
+                        prompt=formatted_prompt,
+                        max_length=message.max_length,
+                        temperature=message.temperature,
+                        top_p=message.top_p,
+                    ):
+                        if token.startswith("Error:"):
+                            await websocket.send_json({"error": token})
+                            break
+
+                        full_response += token
+                        await websocket.send_json({"token": token})
+
+                        # Check after each token if we should continue
+                        # This enables immediate cancellation
+                        try:
+                            # Non-blocking check for a stop message with a very short timeout
+                            data = await asyncio.wait_for(
+                                websocket.receive_json(), timeout=0.001
+                            )
+                            if data.get("command") == "stop":
+                                logging.info("Generation stopped by client request")
+                                break
+                        except asyncio.TimeoutError:
+                            # No message received, continue generation
+                            pass
+
+                    # Generation completed successfully
+                    # Store the assistant's response in the database
+                    if full_response:
+                        message_service.create_message(
+                            content=full_response,
+                            role="assistant",
+                            conversation_id=conversation.id,
+                        )
+
+                    # Notify client that generation is complete
+                    await websocket.send_json({"status": "complete"})
+
+                except Exception as e:
+                    logging.error(f"Error during streaming: {str(e)}")
+                    await websocket.send_json({"error": str(e)})
+
+            elif command == "stop":
+                # Stop command is handled directly during generation
+                pass
+
+            else:
+                await websocket.send_json({"error": f"Unknown command: {command}"})
+
+    except WebSocketDisconnect:
+        logging.info("WebSocket client disconnected")
+
+    except Exception as e:
+        logging.error(f"WebSocket error: {str(e)}")
+        await websocket.send_json({"error": str(e)})
+
+    finally:
+        db.close()

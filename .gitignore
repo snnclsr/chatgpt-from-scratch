@@ -24,3 +24,5 @@ __pycache__/
 
 PRD.md
 project_structure.md
+gpt2-small-*
+chat.db

@@ -24,9 +24,12 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - ./backend/app/ml/gpt2-small-124M.pth:/app/models/gpt2-small-124M.pth
+      - ml_models:/app/models
     environment:
       - PORT=8000
       - ENV=development
+    #   - USE_GPU=true
     # deploy:
     #   resources:
     #     reservations:
@@ -34,6 +37,15 @@ services:
     #         - driver: nvidia
     #           count: 1
     #           capabilities: [ gpu ]
+    # restart: unless-stopped
+    # healthcheck:
+    #   test: [ "CMD", "curl", "-f", "http://localhost:8000/api/health" ]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 10s
 
 volumes:
   sqlite_data:
+  ml_models:
+    driver: local

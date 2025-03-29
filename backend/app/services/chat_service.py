@@ -93,14 +93,15 @@ class ChatService:
         )
 
     def _format_conversation_for_model(self, messages):
-        """Format the conversation history into a prompt for the model"""
-        formatted_prompt = ""
+        return "\n".join([f"{message.content}" for message in messages])
+        # """Format the conversation history into a prompt for the model"""
+        # formatted_prompt = ""
 
-        for message in messages:
-            role = "User" if message.role == "user" else "Assistant"
-            formatted_prompt += f"{role}: {message.content}\n"
+        # for message in messages:
+        #     role = "User" if message.role == "user" else "Assistant"
+        #     formatted_prompt += f"{role}: {message.content}\n"
 
-        # Add final prompt for the assistant to respond
-        formatted_prompt += "Assistant:"
+        # # Add final prompt for the assistant to respond
+        # formatted_prompt += "Assistant:"
 
-        return formatted_prompt
+        # return formatted_prompt
