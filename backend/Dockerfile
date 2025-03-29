@@ -3,9 +3,10 @@ FROM python:3.9-slim
 # # Use PyTorch base image with CUDA support
 # FROM pytorch/pytorch:2.2.0-cuda12.1-cudnn8-runtime
 
-# # Set environment variables
+# Set environment variables
 # ENV PYTHONDONTWRITEBYTECODE=1
 # ENV PYTHONUNBUFFERED=1
+ENV MODEL_PATH=/app/models/gpt2-small-124M.pth
 
 # Set working directory
 WORKDIR /app

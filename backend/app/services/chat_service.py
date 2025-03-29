@@ -1,11 +1,13 @@
 from sqlalchemy.orm import Session
-from typing import Union
+from typing import Union, Dict, List
 import logging
+from functools import lru_cache
 from .user_service import UserService
 from .conversation_service import ConversationService
 from .message_service import MessageService
 from .llm_service import LLMService
 from ..schemas import ChatResponse, ConversationResponse
+from ..models import Conversation, Message
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -20,6 +22,33 @@ class ChatService:
         self.message_service = MessageService(db)
         # Initialize LLM service (singleton pattern ensures only one model instance)
         self.llm_service = LLMService()
+        # Simple in-memory cache for conversation data
+        self._conversation_cache: Dict[int, Conversation] = {}
+        self._message_cache: Dict[int, List[Message]] = {}
+
+    def _clear_cache_for_conversation(self, conversation_id: int) -> None:
+        """Clear cached data for a specific conversation when it's modified"""
+        if conversation_id in self._conversation_cache:
+            del self._conversation_cache[conversation_id]
+        if conversation_id in self._message_cache:
+            del self._message_cache[conversation_id]
+
+    def get_cached_conversation(self, conversation_id: int) -> Conversation:
+        """Get conversation with caching to reduce database hits"""
+        if conversation_id not in self._conversation_cache:
+            conversation = self.conversation_service.get_conversation(conversation_id)
+            if conversation:
+                self._conversation_cache[conversation_id] = conversation
+            return conversation
+        return self._conversation_cache[conversation_id]
+
+    def get_cached_messages(self, conversation_id: int) -> List[Message]:
+        """Get conversation messages with caching to reduce database hits"""
+        if conversation_id not in self._message_cache:
+            messages = self.message_service.get_conversation_messages(conversation_id)
+            self._message_cache[conversation_id] = messages
+            return messages
+        return self._message_cache[conversation_id]
 
     async def process_chat_message(
         self, message: str, chat_id: Union[int, None] = None
@@ -30,24 +59,26 @@ class ChatService:
 
         # Get existing conversation or create new one
         if chat_id:
-            conversation = self.conversation_service.get_conversation(chat_id)
+            conversation = self.get_cached_conversation(chat_id)
             if not conversation:
                 raise ValueError("Conversation not found")
         else:
             conversation = self.conversation_service.create_conversation(
                 user.id, message
             )
+            # Cache the new conversation
+            self._conversation_cache[conversation.id] = conversation
 
         # Store user message
         self.message_service.create_message(
             content=message, role="user", conversation_id=conversation.id
         )
+        # Clear cache since we've modified the conversation
+        self._clear_cache_for_conversation(conversation.id)
 
         try:
             # Get conversation history for context
-            previous_messages = self.message_service.get_conversation_messages(
-                conversation.id
-            )
+            previous_messages = self.get_cached_messages(conversation.id)
             # Format the prompt including conversation history
             prompt = self._format_conversation_for_model(previous_messages)
             logger.info(f"Prompt: {prompt}")
@@ -77,6 +108,8 @@ class ChatService:
         assistant_message = self.message_service.create_message(
             content=response_text, role="assistant", conversation_id=conversation.id
         )
+        # Clear cache since we've modified the conversation
+        self._clear_cache_for_conversation(conversation.id)
 
         # Get latest message for preview
         latest_message = self.message_service.get_latest_message(conversation.id)

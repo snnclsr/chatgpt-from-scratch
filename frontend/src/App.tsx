@@ -7,7 +7,6 @@ function App() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [currentChatId, setCurrentChatId] = useState<string | null>(null);
     const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [useWebSocket, setUseWebSocket] = useState(true);
 
     const updateConversations = useCallback((newConversation: Conversation) => {
         setConversations(prev => {
@@ -59,27 +58,11 @@ function App() {
                                 </svg>
                             </button>
                         )}
-
-                        <div className="flex items-center ml-auto">
-                            <span className="mr-2 text-sm">
-                                {useWebSocket ? 'WebSocket' : 'Server-Sent Events'}
-                            </span>
-                            <label className="relative inline-flex items-center cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={useWebSocket}
-                                    onChange={() => setUseWebSocket(!useWebSocket)}
-                                    className="sr-only peer"
-                                />
-                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                            </label>
-                        </div>
                     </div>
 
                     <Chat
                         chatId={currentChatId}
                         onConversationUpdate={updateConversations}
-                        useWebSocket={useWebSocket}
                     />
                 </div>
             </div>
@@ -87,4 +70,4 @@ function App() {
     );
 }
 
-export default App; 
+export default App;

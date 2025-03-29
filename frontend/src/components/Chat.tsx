@@ -1,20 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Message, Conversation } from '../types';
-import { fetchChatMessages, sendStreamingChatMessage, wsManager, API_BASE_URL, fetchConversations } from '../services/api';
+import { fetchChatMessages, wsManager } from '../services/api';
 
 interface ChatProps {
     chatId: string | null;
     onConversationUpdate: (conversation: Conversation) => void;
-    useWebSocket?: boolean; // Option to toggle between WebSocket and SSE
 }
 
-export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, useWebSocket = true }) => {
+export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate }) => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [streamingContent, setStreamingContent] = useState('');
-    // Create a ref to track current request
-    const activeStreamRef = useRef<AbortController | null>(null);
     // Create a ref to track the current streaming content
     const streamingContentRef = useRef('');
 
@@ -35,24 +32,10 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, useWeb
     useEffect(() => {
         setMessages([]); // Clear messages when chatId changes
         fetchMessages();
-
-        // Cleanup function to abort any ongoing streams when component unmounts
-        return () => {
-            if (activeStreamRef.current) {
-                activeStreamRef.current.abort();
-                activeStreamRef.current = null;
-            }
-        };
     }, [chatId]);
 
     const sendMessage = async (content: string) => {
         if (!content.trim()) return;
-
-        // Cancel any ongoing stream for SSE approach
-        if (activeStreamRef.current) {
-            activeStreamRef.current.abort();
-            activeStreamRef.current = null;
-        }
 
         // Add user message to chat
         const userMessage: Message = {
@@ -69,142 +52,58 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, useWeb
 
         try {
             const chatIdNumber = chatId ? parseInt(chatId) : undefined;
+            console.log('ws-send-chat-message-payload', content, chatIdNumber);
+            // Use WebSocket implementation
+            wsManager.sendChatMessage(
+                content,
+                (token) => {
+                    // Update streaming content as tokens arrive
+                    streamingContentRef.current += token;
+                    setStreamingContent(streamingContentRef.current);
+                },
+                (response) => {
+                    // On complete - stream is done
+                    setIsLoading(false);
 
-            if (useWebSocket) {
-                // Use WebSocket implementation
-                wsManager.sendChatMessage(
-                    content,
-                    (token) => {
-                        // Update streaming content as tokens arrive
-                        streamingContentRef.current += token;
-                        setStreamingContent(streamingContentRef.current);
-                    },
-                    () => {
-                        // On complete - stream is done
-                        setIsLoading(false);
+                    // Instead of fetching all messages again, add the assistant message directly
+                    const finalContent = streamingContentRef.current;
+                    if (finalContent) {
+                        const assistantMessage: Message = {
+                            id: `temp-${Date.now()}`,
+                            content: finalContent,
+                            role: 'assistant',
+                            timestamp: new Date().toISOString()
+                        };
 
-                        // Instead of fetching all messages again, add the assistant message directly
-                        const finalContent = streamingContentRef.current;
-                        if (finalContent) {
-                            const assistantMessage: Message = {
-                                id: `temp-${Date.now()}`,
-                                content: finalContent,
-                                role: 'assistant',
-                                timestamp: new Date().toISOString()
-                            };
+                        setMessages(prev => [...prev, assistantMessage]);
+                        setStreamingContent('');
+                        streamingContentRef.current = '';
+                    }
 
-                            setMessages(prev => [...prev, assistantMessage]);
-                            setStreamingContent('');
-                            streamingContentRef.current = '';
-                        }
+                    // Check if response contains the conversation data
+                    if (response && response.conversation) {
+                        // Use the conversation data directly from the WebSocket response
+                        onConversationUpdate(response.conversation);
+                    } else {
+                        // Log a warning if no conversation data was received
+                        console.warn('No conversation data received from backend');
+                    }
+                },
+                (error) => {
+                    console.error('WebSocket error:', error);
+                    setIsLoading(false);
+                },
+                chatIdNumber
+            );
 
-                        // Fetch the updated conversation and update the sidebar
-                        if (chatIdNumber) {
-                            fetchConversations()
-                                .then(conversations => {
-                                    const updatedConversation = conversations.find(
-                                        conv => conv.id === chatIdNumber
-                                    );
-                                    if (updatedConversation) {
-                                        onConversationUpdate(updatedConversation);
-                                    }
-                                })
-                                .catch(err => console.error('Error fetching updated conversation:', err));
-                        } else {
-                            // This was a new conversation, fetch the latest conversations
-                            // to get the newly created conversation ID
-                            fetchConversations()
-                                .then(conversations => {
-                                    // The most recent conversation should be the first one
-                                    if (conversations.length > 0) {
-                                        onConversationUpdate(conversations[0]);
-                                    }
-                                })
-                                .catch(err => console.error('Error fetching new conversation:', err));
-                        }
-                    },
-                    (error) => {
-                        console.error('WebSocket error:', error);
-                        setIsLoading(false);
-                    },
-                    chatIdNumber
-                );
-            } else {
-                // Use traditional SSE approach
-                activeStreamRef.current = await sendStreamingChatMessage(
-                    content,
-                    (token) => {
-                        // Update streaming content as tokens arrive
-                        streamingContentRef.current += token;
-                        setStreamingContent(streamingContentRef.current);
-                    },
-                    () => {
-                        // On complete - stream is done
-                        setIsLoading(false);
-                        activeStreamRef.current = null;
-
-                        // Instead of fetching all messages again, add the assistant message directly
-                        const finalContent = streamingContentRef.current;
-                        if (finalContent) {
-                            const assistantMessage: Message = {
-                                id: `temp-${Date.now()}`,
-                                content: finalContent,
-                                role: 'assistant',
-                                timestamp: new Date().toISOString()
-                            };
-
-                            setMessages(prev => [...prev, assistantMessage]);
-                            setStreamingContent('');
-                            streamingContentRef.current = '';
-                        }
-
-                        // Fetch the updated conversation and update the sidebar
-                        if (chatIdNumber) {
-                            fetchConversations()
-                                .then(conversations => {
-                                    const updatedConversation = conversations.find(
-                                        conv => conv.id === chatIdNumber
-                                    );
-                                    if (updatedConversation) {
-                                        onConversationUpdate(updatedConversation);
-                                    }
-                                })
-                                .catch(err => console.error('Error fetching updated conversation:', err));
-                        } else {
-                            // This was a new conversation, fetch the latest conversations
-                            // to get the newly created conversation ID
-                            fetchConversations()
-                                .then(conversations => {
-                                    // The most recent conversation should be the first one
-                                    if (conversations.length > 0) {
-                                        onConversationUpdate(conversations[0]);
-                                    }
-                                })
-                                .catch(err => console.error('Error fetching new conversation:', err));
-                        }
-                    },
-                    (error) => {
-                        console.error('Streaming error:', error);
-                        setIsLoading(false);
-                        activeStreamRef.current = null;
-                    },
-                    chatIdNumber
-                );
-            }
         } catch (error) {
             console.error('Error sending message:', error);
             setIsLoading(false);
-            activeStreamRef.current = null;
         }
     };
 
     const stopGeneration = () => {
-        if (useWebSocket) {
-            wsManager.stopGeneration();
-        } else if (activeStreamRef.current) {
-            activeStreamRef.current.abort();
-            activeStreamRef.current = null;
-        }
+        wsManager.stopGeneration();
         setIsLoading(false);
     };
 
@@ -214,9 +113,6 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, useWeb
                 <h2 className="text-xl font-semibold">
                     {chatId ? `Chat ${chatId}` : 'New Chat'}
                 </h2>
-                <div className="mt-1 text-sm">
-                    Using: {useWebSocket ? 'WebSocket (Bidirectional)' : 'Server-Sent Events'}
-                </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {/* Chat messages */}

@@ -29,21 +29,24 @@ services:
     environment:
       - PORT=8000
       - ENV=development
-    #   - USE_GPU=true
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [ gpu ]
-    # restart: unless-stopped
-    # healthcheck:
-    #   test: [ "CMD", "curl", "-f", "http://localhost:8000/api/health" ]
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 3
-    #   start_period: 10s
+      - MODEL_PATH=/app/models/gpt2-small-124M.pth
+      # - PYTHONDONTWRITEBYTECODE=1
+      # - PYTHONUNBUFFERED=1
+      #   - USE_GPU=true
+      # deploy:
+      #   resources:
+      #     reservations:
+      #       devices:
+      #         - driver: nvidia
+      #           count: 1
+      #           capabilities: [ gpu ]
+      # restart: unless-stopped
+      # healthcheck:
+      #   test: [ "CMD", "curl", "-f", "http://localhost:8000/api/health" ]
+      #   interval: 30s
+      #   timeout: 10s
+      #   retries: 3
+      #   start_period: 10s
 
 volumes:
   sqlite_data:

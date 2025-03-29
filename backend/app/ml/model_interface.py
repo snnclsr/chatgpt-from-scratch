@@ -41,52 +41,42 @@ class ModelInterface:
             # Initialize tokenizer
             self.tokenizer = tiktoken.get_encoding("gpt2")
 
+            # Set up model config directly - simplify config handling
             self.BASE_CONFIG = {
                 "vocab_size": 50257,  # Vocabulary size
                 "context_length": 1024,  # Context length
                 "drop_rate": 0.0,  # Dropout rate
                 "qkv_bias": True,  # Query-key-value bias
+                "emb_dim": 768,
+                "n_layers": 12,
+                "n_heads": 12,  # Using gpt2-small config directly
             }
 
-            model_configs = {
-                "gpt2-small (124M)": {"emb_dim": 768, "n_layers": 12, "n_heads": 12},
-                "gpt2-medium (355M)": {"emb_dim": 1024, "n_layers": 24, "n_heads": 16},
-                "gpt2-large (774M)": {"emb_dim": 1280, "n_layers": 36, "n_heads": 20},
-                "gpt2-xl (1558M)": {"emb_dim": 1600, "n_layers": 48, "n_heads": 25},
-            }
-
-            # Look for model in different locations (local development vs docker)
+            # Use environment variable for model path with fallback to standard locations
             model_filename = "gpt2-small-124M.pth"
+            model_path = os.environ.get("MODEL_PATH")
 
-            # Check current directory first
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            local_path = os.path.join(current_dir, model_filename)
+            if not model_path:
+                # Check Docker models volume first (as per docker-compose.yml configuration)
+                models_dir = "/app/models"
+                docker_path = os.path.join(models_dir, model_filename)
 
-            # Check models directory (for Docker)
-            models_dir = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.dirname(current_dir))), "models"
-            )
-            docker_path = os.path.join(models_dir, model_filename)
+                # Check local directory as fallback
+                current_dir = os.path.dirname(os.path.abspath(__file__))
+                local_path = os.path.join(current_dir, model_filename)
 
-            # Try different paths
-            if os.path.exists(local_path):
-                file_path = local_path
-                logger.info(f"Loading model from local directory: {file_path}")
-            elif os.path.exists(docker_path):
-                file_path = docker_path
-                logger.info(f"Loading model from models volume: {file_path}")
-            else:
-                # Fallback to just the filename (current directory)
-                file_path = model_filename
-                logger.info(
-                    f"Attempting to load model from current directory: {file_path}"
-                )
+                if os.path.exists(docker_path):
+                    model_path = docker_path
+                elif os.path.exists(local_path):
+                    model_path = local_path
+                else:
+                    # Last resort - just use the filename and hope it's in the current directory
+                    model_path = model_filename
 
-            CHOOSE_MODEL = "gpt2-small (124M)"
-            self.BASE_CONFIG.update(model_configs[CHOOSE_MODEL])
+            logger.info(f"Loading model from: {model_path}")
 
             self.model = GPTModel(self.BASE_CONFIG)
-            self.model.load_state_dict(torch.load(file_path, weights_only=True))
+            self.model.load_state_dict(torch.load(model_path, weights_only=True))
             self.model.eval()
             self.model.to(self.device)
 
@@ -94,7 +84,6 @@ class ModelInterface:
             logger.info(f"Model loaded successfully in {load_time:.2f} seconds")
         except Exception as e:
             logger.error(f"Failed to load model: {str(e)}")
-            # Fallback to a simple model or raise error depending on requirements
             self.model = None
             self.tokenizer = None
             raise
