@@ -40,12 +40,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (!isOpen) return null;
 
     return (
-        <div className="h-screen bg-white shadow-lg p-4 flex flex-col">
+        <div className="h-screen bg-[#202123] shadow-lg p-4 flex flex-col border-r border-gray-700">
             <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">Chats</h2>
+                <h2 className="text-xl font-semibold text-white">Chats</h2>
                 <button
                     onClick={onClose}
-                    className="p-2 hover:bg-gray-100 rounded-lg"
+                    className="p-2 hover:bg-gray-800 rounded-lg text-gray-300"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -55,7 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <button
                 onClick={onNewChat}
-                className="w-full mb-4 p-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                className="w-full mb-4 p-2 bg-[#444654] text-white rounded hover:bg-[#565869]"
             >
                 New Chat
             </button>
@@ -66,13 +66,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         key={conversation.id}
                         onClick={() => onSelectChat(conversation.id.toString())}
                         className={`w-full p-2 text-left rounded ${conversation.id.toString() === currentChatId
-                            ? 'bg-gray-200'
-                            : 'hover:bg-gray-100'
+                            ? 'bg-[#343541] text-white'
+                            : 'hover:bg-[#2A2B32] text-gray-300'
                             }`}
                     >
                         <div className="font-medium">{conversation.title || `Chat ${conversation.id}`}</div>
                         {conversation.preview && (
-                            <div className="text-sm text-gray-500 truncate">
+                            <div className="text-sm text-gray-400 truncate">
                                 {conversation.preview}
                             </div>
                         )}

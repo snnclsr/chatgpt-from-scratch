@@ -84,7 +84,7 @@ const NewConversation = ({
         <div className="flex flex-col items-center justify-center h-screen w-full">
             <div className="flex flex-col text-center space-y-6 mb-8">
                 {/* <h1 className="text-4xl font-bold text-gray-800">ChatGPT</h1> */}
-                <p className="text-2xl text-gray-600">How can I help you today?</p>
+                <p className="text-2xl text-gray-300">How can I help you today?</p>
             </div>
 
             <div className="w-full max-w-[600px]">
@@ -206,7 +206,7 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
         <div className="h-full flex flex-col">
             {!isNewChat && (
                 <div className="max-w-[48rem] mx-auto w-full px-4">
-                    <h2 className="text-xl font-semibold mb-4">
+                    <h2 className="text-xl font-semibold mb-4 text-gray-200">
                         {chatId ? `Chat ${chatId}` : 'New Chat'}
                     </h2>
                 </div>
@@ -272,7 +272,7 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
 
             {/* Input area - fixed for chat, inline for new chat */}
             {!isNewChat && (
-                <div className={`fixed bottom-0 ${isSidebarOpen ? 'left-[260px]' : 'left-0'} right-0`}>
+                <div className={`fixed bottom-0 ${isSidebarOpen ? 'left-[260px]' : 'left-0'} right-0 bg-[#1E1E1E]`}>
                     <div className="max-w-[48rem] mx-auto w-full mb-8">
                         <ChatInput
                             input={input}
