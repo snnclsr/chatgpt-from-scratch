@@ -100,7 +100,7 @@ export class WebSocketChatManager {
         onComplete: (response: any) => void,
         onError: (error: string) => void,
         chatId?: number,
-        options = { temperature: 0.7, max_length: 20, top_p: 0.9 }
+        options = { temperature: 0.7, max_length: 25, top_p: 0.9 }
     ): void {
         // Set callbacks
         this.onTokenCallback = onToken;
@@ -120,7 +120,7 @@ export class WebSocketChatManager {
     private sendMessageToServer(
         content: string,
         chatId?: number,
-        options = { temperature: 0.7, max_length: 20, top_p: 0.9 }
+        options = { temperature: 0.7, max_length: 25, top_p: 0.9 }
     ): void {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
             if (this.onErrorCallback) {

@@ -40,7 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (!isOpen) return null;
 
     return (
-        <div className="h-screen bg-white shadow-lg p-4">
+        <div className="h-screen bg-white shadow-lg p-4 flex flex-col">
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-semibold">Chats</h2>
                 <button
@@ -60,7 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 New Chat
             </button>
 
-            <div className="space-y-2">
+            <div className="space-y-2 overflow-y-auto flex-1">
                 {conversations.map((conversation) => (
                     <button
                         key={conversation.id}

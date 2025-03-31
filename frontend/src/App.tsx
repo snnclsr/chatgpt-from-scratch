@@ -63,6 +63,7 @@ function App() {
                     <Chat
                         chatId={currentChatId}
                         onConversationUpdate={updateConversations}
+                        isSidebarOpen={isSidebarOpen}
                     />
                 </div>
             </div>

@@ -78,7 +78,7 @@ async def health_check():
 
 @app.websocket("/api/ws/chat")
 async def websocket_chat(websocket: WebSocket):
-    """WebSocket endpoint for bidirectional chat streaming"""
+    """WebSocket endpoint for chat streaming"""
     await websocket.accept()
 
     try:

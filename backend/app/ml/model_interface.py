@@ -80,7 +80,7 @@ class ModelInterface:
 
             self.model = GPTModel(self.BASE_CONFIG)
             self.model.load_state_dict(torch.load(model_path, weights_only=True))
-            self.model.eval()
+            self.model = self.model.eval()
 
             # Check if Apple Silicon MPS is available
             if torch.backends.mps.is_available():

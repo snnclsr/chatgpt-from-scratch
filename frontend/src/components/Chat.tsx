@@ -5,9 +5,102 @@ import { fetchChatMessages, wsManager } from '../services/api';
 interface ChatProps {
     chatId: string | null;
     onConversationUpdate: (conversation: Conversation) => void;
+    isSidebarOpen: boolean;
 }
 
-export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate }) => {
+// Input component for both new and existing chats
+const ChatInput = ({
+    input,
+    setInput,
+    sendMessage,
+    isLoading,
+    stopGeneration,
+    className = ""
+}: {
+    input: string;
+    setInput: (value: string) => void;
+    sendMessage: (message: string) => void;
+    isLoading: boolean;
+    stopGeneration: () => void;
+    className?: string;
+}) => {
+    return (
+        <form
+            onSubmit={(e) => {
+                e.preventDefault();
+                sendMessage(input);
+            }}
+            className={`mx-4 ${className}`}
+        >
+            <div className="flex items-center space-x-2 bg-[#40414F] p-4 rounded-lg shadow-lg border border-gray-900/50">
+                <input
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    className="flex-1 bg-transparent text-white placeholder-gray-400 focus:outline-none"
+                    placeholder="Type your message..."
+                    disabled={isLoading}
+                />
+                <button
+                    type="submit"
+                    disabled={isLoading || !input.trim()}
+                    className="p-1 rounded-lg text-gray-400 hover:bg-gray-600/30 hover:text-gray-200 disabled:hover:text-gray-400 transition-colors"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+                        <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+                    </svg>
+                </button>
+                {isLoading && (
+                    <button
+                        type="button"
+                        onClick={stopGeneration}
+                        className="p-1 rounded-lg text-gray-400 hover:bg-gray-600/30 hover:text-gray-200 transition-colors"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+                            <path fillRule="evenodd" d="M4.5 7.5a3 3 0 013-3h9a3 3 0 013 3v9a3 3 0 01-3 3h-9a3 3 0 01-3-3v-9z" clipRule="evenodd" />
+                        </svg>
+                    </button>
+                )}
+            </div>
+        </form>
+    );
+};
+
+// New conversation component with welcome message and input
+const NewConversation = ({
+    input,
+    setInput,
+    sendMessage,
+    isLoading,
+    stopGeneration
+}: {
+    input: string;
+    setInput: (value: string) => void;
+    sendMessage: (message: string) => void;
+    isLoading: boolean;
+    stopGeneration: () => void;
+}) => {
+    return (
+        <div className="flex flex-col items-center justify-center h-screen w-full">
+            <div className="flex flex-col text-center space-y-6 mb-8">
+                {/* <h1 className="text-4xl font-bold text-gray-800">ChatGPT</h1> */}
+                <p className="text-2xl text-gray-600">How can I help you today?</p>
+            </div>
+
+            <div className="w-full max-w-[600px]">
+                <ChatInput
+                    input={input}
+                    setInput={setInput}
+                    sendMessage={sendMessage}
+                    isLoading={isLoading}
+                    stopGeneration={stopGeneration}
+                />
+            </div>
+        </div>
+    );
+};
+
+export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSidebarOpen }) => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -107,78 +200,90 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate }) => {
         setIsLoading(false);
     };
 
+    const isNewChat = !chatId && messages.length === 0;
+
     return (
         <div className="h-full flex flex-col">
-            <div className="mb-4">
-                <h2 className="text-xl font-semibold">
-                    {chatId ? `Chat ${chatId}` : 'New Chat'}
-                </h2>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {/* Chat messages */}
-                {messages.map((message) => (
-                    <div
-                        key={message.id}
-                        className={`p-4 rounded-lg whitespace-pre-wrap ${message.role === 'user'
-                            ? 'bg-blue-100 ml-auto max-w-[80%]'
-                            : 'bg-gray-100 mr-auto max-w-[80%]'
-                            }`}
-                    >
-                        {message.content}
-                    </div>
-                ))}
+            {!isNewChat && (
+                <div className="max-w-[48rem] mx-auto w-full px-4">
+                    <h2 className="text-xl font-semibold mb-4">
+                        {chatId ? `Chat ${chatId}` : 'New Chat'}
+                    </h2>
+                </div>
+            )}
 
-                {/* Streaming message */}
-                {isLoading && streamingContent && (
-                    <div className="bg-gray-100 p-4 rounded-lg mr-auto max-w-[80%] whitespace-pre-wrap">
-                        {streamingContent}
-                    </div>
-                )}
+            {/* Messages area with padding at bottom to account for fixed input */}
+            <div className="flex-1 overflow-y-auto">
+                <div className={`${isNewChat ? 'h-full flex items-center justify-center' : 'max-w-[48rem] mx-auto w-full px-4 space-y-4 pb-32'}`}>
+                    {isNewChat ? (
+                        <NewConversation
+                            input={input}
+                            setInput={setInput}
+                            sendMessage={sendMessage}
+                            isLoading={isLoading}
+                            stopGeneration={stopGeneration}
+                        />
+                    ) : (
+                        <>
+                            {/* Chat messages */}
+                            {
+                                messages.map((message) => (
+                                    <div
+                                        key={message.id}
+                                        className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
+                                    >
+                                        <div
+                                            className={`p-4 rounded-lg whitespace-pre-wrap ${message.role === 'user'
+                                                ? 'bg-[#343541] text-white max-w-[80%]'
+                                                : 'bg-[#444654] text-white max-w-[80%]'
+                                                }`}
+                                        >
+                                            {message.content}
+                                        </div>
+                                    </div>
+                                ))
+                            }
 
-                {/* Loading indicator */}
-                {isLoading && !streamingContent && (
-                    <div className="bg-gray-100 p-4 rounded-lg mr-auto">
-                        <div className="typing-indicator">
-                            <span></span>
-                            <span></span>
-                            <span></span>
-                        </div>
-                    </div>
-                )}
-            </div>
+                            {/* Streaming message */}
+                            {isLoading && streamingContent && (
+                                <div className="flex justify-start mb-4">
+                                    <div className="bg-[#444654] text-white p-4 rounded-lg max-w-[80%] whitespace-pre-wrap">
+                                        {streamingContent}
+                                    </div>
+                                </div>
+                            )}
 
-            {/* Input area */}
-            <form onSubmit={(e) => {
-                e.preventDefault();
-                sendMessage(input);
-            }} className="p-4 border-t mt-auto">
-                <div className="flex space-x-4">
-                    <input
-                        type="text"
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        className="flex-1 p-2 border rounded-lg"
-                        placeholder="Type your message..."
-                        disabled={isLoading}
-                    />
-                    <button
-                        type="submit"
-                        disabled={isLoading || !input.trim()}
-                        className="px-4 py-2 bg-blue-500 text-white rounded-lg disabled:bg-blue-300"
-                    >
-                        Send
-                    </button>
-                    {isLoading && (
-                        <button
-                            type="button"
-                            onClick={stopGeneration}
-                            className="px-4 py-2 bg-red-500 text-white rounded-lg"
-                        >
-                            Stop
-                        </button>
+                            {/* Loading indicator */}
+                            {isLoading && !streamingContent && (
+                                <div className="flex justify-start mb-4">
+                                    <div className="bg-[#444654] text-white p-4 rounded-lg">
+                                        <div className="typing-indicator">
+                                            <span></span>
+                                            <span></span>
+                                            <span></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
-            </form>
+            </div>
+
+            {/* Input area - fixed for chat, inline for new chat */}
+            {!isNewChat && (
+                <div className={`fixed bottom-0 ${isSidebarOpen ? 'left-[260px]' : 'left-0'} right-0`}>
+                    <div className="max-w-[48rem] mx-auto w-full mb-8">
+                        <ChatInput
+                            input={input}
+                            setInput={setInput}
+                            sendMessage={sendMessage}
+                            isLoading={isLoading}
+                            stopGeneration={stopGeneration}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }; 
