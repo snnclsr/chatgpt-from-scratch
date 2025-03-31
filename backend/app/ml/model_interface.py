@@ -27,7 +27,10 @@ class ModelInterface:
     def __init__(self):
         """Initialize the model interface and load the model"""
         logger.info("Initializing model interface")
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device(
+            "mps" if torch.backends.mps.is_available() else "cpu"
+        )
         logger.info(f"Using device: {self.device}")
 
         # Load model - this will be done once at startup
@@ -78,7 +81,14 @@ class ModelInterface:
             self.model = GPTModel(self.BASE_CONFIG)
             self.model.load_state_dict(torch.load(model_path, weights_only=True))
             self.model.eval()
-            self.model.to(self.device)
+
+            # Check if Apple Silicon MPS is available
+            if torch.backends.mps.is_available():
+                logger.info("Using Apple Silicon MPS for acceleration")
+                self.model.to("mps")
+            else:
+                logger.info(f"MPS not available, using {self.device}")
+                self.model.to(self.device)
 
             load_time = time.time() - start_time
             logger.info(f"Model loaded successfully in {load_time:.2f} seconds")
@@ -129,10 +139,10 @@ class ModelInterface:
 
             # Convert prompt to token IDs
             idx = text_to_token_ids(prompt, self.tokenizer)
+            idx = idx.to(self.device)
 
             # Store original prompt length to track new tokens
             original_length = idx.shape[1]
-            prev_idx_len = original_length
 
             # For-loop is the same as before: Get logits, and only focus on last time step
             for _ in range(max_length):
@@ -148,7 +158,7 @@ class ModelInterface:
                     min_val = top_logits[:, -1]
                     logits = torch.where(
                         logits < min_val,
-                        torch.tensor(float("-inf")).to(logits.device),
+                        torch.tensor(float("-inf")).to(self.device),
                         logits,
                     )
 
