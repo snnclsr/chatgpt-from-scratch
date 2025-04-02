@@ -9,5 +9,5 @@ export interface Conversation {
     id: number;
     title: string;
     created_at: string;
-    preview: string | null;
+    preview?: string | null;
 } 

@@ -25,7 +25,9 @@ class Conversation(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     user = relationship("User", back_populates="conversations")
-    messages = relationship("Message", back_populates="conversation")
+    messages = relationship(
+        "Message", back_populates="conversation", cascade="all, delete-orphan"
+    )
 
 
 class Message(Base):

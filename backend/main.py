@@ -70,6 +70,18 @@ async def get_conversations(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.delete("/api/conversations/{conversation_id}")
+async def delete_conversation(conversation_id: int, db: Session = Depends(get_db)):
+    """Delete a specific conversation"""
+    try:
+        conversation_service = ConversationService(db)
+        if conversation_service.delete_conversation(conversation_id):
+            return {"status": "success", "message": "Conversation deleted successfully"}
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint"""
@@ -186,6 +198,8 @@ async def websocket_chat(websocket: WebSocket):
                                 "conversation": {
                                     "id": updated_conversation.id,
                                     "title": updated_conversation.title,
+                                    "created_at": updated_conversation.created_at.isoformat(),
+                                    # "preview": updated_conversation.preview,
                                     "lastMessageTimestamp": updated_conversation.created_at.isoformat(),
                                 },
                             }

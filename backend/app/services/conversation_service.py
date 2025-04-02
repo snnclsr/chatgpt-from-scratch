@@ -72,3 +72,7 @@ class ConversationService:
                     }
                 )
         return result
+
+    def delete_conversation(self, conversation_id: int) -> bool:
+        """Delete a conversation and all its associated messages"""
+        return self.repository.delete(conversation_id)
