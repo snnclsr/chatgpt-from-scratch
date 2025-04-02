@@ -1,12 +1,19 @@
 import React, { useState, useCallback } from 'react';
 import { Chat } from './components/Chat';
 import { Sidebar } from './components/Sidebar';
+import { ModelSettings } from './components/ModelSettings';
 import { Conversation } from './types';
 
 function App() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [currentChatId, setCurrentChatId] = useState<string | null>(null);
     const [conversations, setConversations] = useState<Conversation[]>([]);
+    const [modelSettings, setModelSettings] = useState({
+        temperature: 0.7,
+        max_length: 25,
+        top_p: 0.9
+    });
 
     const updateConversations = useCallback((newConversation: Conversation) => {
         setConversations(prev => {
@@ -31,7 +38,7 @@ function App() {
 
     return (
         <div className="min-h-screen bg-[#1E1E1E] text-white flex">
-            {/* Sidebar */}
+            {/* Left Sidebar */}
             <div className={`transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-0'}`}>
                 <Sidebar
                     isOpen={isSidebarOpen}
@@ -58,15 +65,35 @@ function App() {
                                 </svg>
                             </button>
                         )}
+
+                        {/* Settings button */}
+                        <button
+                            onClick={() => setIsSettingsOpen(true)}
+                            className="p-2 hover:bg-gray-700 rounded-lg text-gray-200 ml-auto"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        </button>
                     </div>
 
                     <Chat
                         chatId={currentChatId}
                         onConversationUpdate={updateConversations}
                         isSidebarOpen={isSidebarOpen}
+                        modelSettings={modelSettings}
                     />
                 </div>
             </div>
+
+            {/* Settings Sidebar */}
+            <ModelSettings
+                isOpen={isSettingsOpen}
+                onClose={() => setIsSettingsOpen(false)}
+                settings={modelSettings}
+                onSettingsChange={setModelSettings}
+            />
         </div>
     );
 }

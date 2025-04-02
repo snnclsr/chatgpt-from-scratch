@@ -146,6 +146,9 @@ async def websocket_chat(websocket: WebSocket):
                         previous_messages
                     )
                     logging.info(f"Formatted prompt: {formatted_prompt}")
+                    logging.info(
+                        f"Model settings - Temperature: {message.temperature}, Max Length: {message.max_length}, Top P: {message.top_p}"
+                    )
                     # Start token generation
                     full_response = ""
 

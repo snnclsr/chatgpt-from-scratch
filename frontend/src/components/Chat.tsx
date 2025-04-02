@@ -6,6 +6,11 @@ interface ChatProps {
     chatId: string | null;
     onConversationUpdate: (conversation: Conversation) => void;
     isSidebarOpen: boolean;
+    modelSettings: {
+        temperature: number;
+        max_length: number;
+        top_p: number;
+    };
 }
 
 // Input component for both new and existing chats
@@ -100,7 +105,7 @@ const NewConversation = ({
     );
 };
 
-export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSidebarOpen }) => {
+export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSidebarOpen, modelSettings }) => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -140,17 +145,16 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
         setMessages(prev => [...prev, userMessage]);
         setInput('');
         setIsLoading(true);
-        setStreamingContent(''); // Reset streaming content
-        streamingContentRef.current = ''; // Also reset the ref
+        setStreamingContent('');
+        streamingContentRef.current = '';
 
         try {
             const chatIdNumber = chatId ? parseInt(chatId) : undefined;
-            console.log('ws-send-chat-message-payload', content, chatIdNumber);
-            // Use WebSocket implementation
+            console.log('ws-send-chat-message-payload', content, chatIdNumber, modelSettings);
+            // Use WebSocket implementation with model settings
             wsManager.sendChatMessage(
                 content,
                 (token) => {
-                    // Update streaming content as tokens arrive
                     streamingContentRef.current += token;
                     setStreamingContent(streamingContentRef.current);
                 },
@@ -158,7 +162,6 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
                     // On complete - stream is done
                     setIsLoading(false);
 
-                    // Instead of fetching all messages again, add the assistant message directly
                     const finalContent = streamingContentRef.current;
                     if (finalContent) {
                         const assistantMessage: Message = {
@@ -173,12 +176,9 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
                         streamingContentRef.current = '';
                     }
 
-                    // Check if response contains the conversation data
                     if (response && response.conversation) {
-                        // Use the conversation data directly from the WebSocket response
                         onConversationUpdate(response.conversation);
                     } else {
-                        // Log a warning if no conversation data was received
                         console.warn('No conversation data received from backend');
                     }
                 },
@@ -186,7 +186,8 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
                     console.error('WebSocket error:', error);
                     setIsLoading(false);
                 },
-                chatIdNumber
+                chatIdNumber,
+                modelSettings
             );
 
         } catch (error) {
