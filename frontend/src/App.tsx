@@ -39,35 +39,20 @@ function App() {
 
     return (
         <div className="min-h-screen bg-[#1E1E1E] text-white flex relative">
-            {/* Left Sidebar */}
-            <div className={`transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-0'}`}>
-                <Sidebar
-                    isOpen={isSidebarOpen}
-                    onClose={() => setIsSidebarOpen(false)}
-                    onNewChat={createNewChat}
-                    currentChatId={currentChatId}
-                    onSelectChat={setCurrentChatId}
-                    conversations={conversations}
-                    setConversations={setConversations}
-                />
-            </div>
+            {/* Overlay Sidebar */}
+            <Sidebar
+                isOpen={isSidebarOpen}
+                onClose={() => setIsSidebarOpen(false)}
+                onNewChat={createNewChat}
+                currentChatId={currentChatId}
+                onSelectChat={setCurrentChatId}
+                conversations={conversations}
+                setConversations={setConversations}
+            />
 
             {/* Main Content */}
             <div className="flex-1">
                 <div className="p-4">
-                    <div className="flex justify-between items-center mb-4">
-                        {!isSidebarOpen && (
-                            <button
-                                onClick={() => setIsSidebarOpen(true)}
-                                className="p-2 hover:bg-gray-700 rounded-lg text-gray-200"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                                </svg>
-                            </button>
-                        )}
-                    </div>
-
                     <Chat
                         chatId={currentChatId}
                         onConversationUpdate={updateConversations}
@@ -76,6 +61,18 @@ function App() {
                     />
                 </div>
             </div>
+
+            {/* Fixed Sidebar Toggle Button */}
+            {!isSidebarOpen && (
+                <button
+                    onClick={() => setIsSidebarOpen(true)}
+                    className="fixed top-4 left-4 p-2 hover:bg-gray-700 rounded-lg text-gray-200 z-10 bg-[#2E2E2E] shadow-lg"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+            )}
 
             {/* Fixed Settings Button */}
             <button

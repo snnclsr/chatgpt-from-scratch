@@ -215,7 +215,7 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
     const isNewChat = !chatId && messages.length === 0;
 
     return (
-        <div className={`h-full flex flex-col ${isSidebarOpen ? 'ml-[260px]' : ''}`}>
+        <div className="h-full flex flex-col pt-2">
             {!isNewChat && (
                 <div className="max-w-[48rem] mx-auto w-full px-4 py-4 flex justify-between items-center">
                     <h2 className="text-xl font-semibold text-gray-200">
@@ -291,7 +291,7 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
 
             {/* Input area - fixed for chat, inline for new chat */}
             {!isNewChat && (
-                <div className={`fixed bottom-0 ${isSidebarOpen ? 'left-[260px]' : 'left-0'} right-0 bg-[#1E1E1E] py-4 border-t border-gray-700`}>
+                <div className="fixed bottom-0 left-0 right-0 bg-[#1E1E1E] py-4 border-t border-gray-700">
                     <div className="max-w-[48rem] mx-auto w-full">
                         <ChatInput
                             input={input}
