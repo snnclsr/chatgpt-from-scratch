@@ -49,7 +49,8 @@ class HuggingFaceModel(BaseModelInterface):
 
         try:
             formatted_prompt = self.tokenizer.apply_chat_template(
-                [{"role": "user", "content": prompt}],
+                # [{"role": "user", "content": prompt}]
+                prompt,
                 tokenize=False,
                 add_generation_prompt=True,
             )

@@ -1,6 +1,7 @@
 import uuid
 import logging
-from typing import List
+from itertools import groupby
+from typing import List, Dict, Any
 
 import asyncio
 from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect
@@ -170,6 +171,16 @@ async def health_check():
     return HealthResponse(status="ok")
 
 
+def _fix_gemma_messages(messages: List[Dict[str, Any]]):
+    """Fix the Gemma messages to alternate user/assistant/user/assistant/"""
+    grouped = []
+    for role, group in groupby(messages, key=lambda x: x["role"]):
+        contents = [msg["content"] for msg in group]
+        merged = "\n".join(contents)
+        grouped.append({"role": role, "content": merged})
+    return grouped
+
+
 @app.websocket("/api/ws/{model_id}")
 async def websocket_chat(websocket: WebSocket, model_id: str):
     """Process the request"""
@@ -230,19 +241,27 @@ async def websocket_chat(websocket: WebSocket, model_id: str):
                     )
 
                     # Format the prompt including conversation history
-                    formatted_prompt = chat_service._format_conversation_for_model(
-                        previous_messages
-                    )
-                    logging.info(f"Formatted prompt: {formatted_prompt}")
+                    previous_messages = [
+                        {
+                            "role": m.role,
+                            "content": m.content,
+                        }
+                        for m in previous_messages
+                    ]
+                    # Fixing the Gemma exception:
+                    # Conversation roles must alternate user/assistant/user/assistant/
+                    if model_id.startswith("gemma"):
+                        previous_messages = _fix_gemma_messages(previous_messages)
+                    logger.info(f"Previous messages:")
+                    print(previous_messages)
                     logging.info(
                         f"Model settings - Temperature: {message.temperature}, Max Length: {message.max_length}, Top P: {message.top_p}"
                     )
                     # Start token generation
                     full_response = ""
-
                     try:
                         async for token in model.generate_stream(
-                            prompt=formatted_prompt,
+                            prompt=previous_messages,
                             max_length=message.max_length,
                             temperature=message.temperature,
                             top_p=message.top_p,
