@@ -74,7 +74,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     const groupedConversations = groupConversationsByDate(conversations);
     return (
-        <div className="h-screen bg-[#202123] shadow-lg p-4 flex flex-col border-r border-gray-700">
+        <div className="fixed top-0 left-0 h-screen w-[260px] bg-[#202123] shadow-lg p-4 flex flex-col border-r border-gray-700 z-10">
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-semibold text-white">Chats</h2>
                 <button

@@ -109,6 +109,17 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
     const [streamingContent, setStreamingContent] = useState('');
     const [selectedModel, setSelectedModel] = useState('gemma');
     const streamingContentRef = useRef('');
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    // Add this function to scroll to bottom
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    // Call scrollToBottom when messages change or streaming content updates
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages, streamingContent]);
 
     const fetchMessages = async () => {
         if (!chatId) {
@@ -204,7 +215,7 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
     const isNewChat = !chatId && messages.length === 0;
 
     return (
-        <div className="h-full flex flex-col">
+        <div className={`h-full flex flex-col ${isSidebarOpen ? 'ml-[260px]' : ''}`}>
             {!isNewChat && (
                 <div className="max-w-[48rem] mx-auto w-full px-4 py-4 flex justify-between items-center">
                     <h2 className="text-xl font-semibold text-gray-200">
@@ -218,8 +229,8 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
             )}
 
             {/* Messages area with padding at bottom to account for fixed input */}
-            <div className="flex-1 overflow-y-auto">
-                <div className={`${isNewChat ? 'h-full flex items-center justify-center' : 'max-w-[48rem] mx-auto w-full px-4 space-y-4 pb-32'}`}>
+            <div className="flex-1 overflow-y-auto pb-24">
+                <div className={`${isNewChat ? 'h-full flex items-center justify-center' : 'max-w-[48rem] mx-auto w-full px-4 space-y-4'}`}>
                     {isNewChat ? (
                         <NewConversation
                             input={input}
@@ -270,6 +281,9 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
                                     </div>
                                 </div>
                             )}
+
+                            {/* Add this invisible div for auto-scrolling */}
+                            <div ref={messagesEndRef} />
                         </>
                     )}
                 </div>
@@ -277,8 +291,8 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
 
             {/* Input area - fixed for chat, inline for new chat */}
             {!isNewChat && (
-                <div className={`fixed bottom-0 ${isSidebarOpen ? 'left-[260px]' : 'left-0'} right-0 bg-[#1E1E1E]`}>
-                    <div className="max-w-[48rem] mx-auto w-full mb-8">
+                <div className={`fixed bottom-0 ${isSidebarOpen ? 'left-[260px]' : 'left-0'} right-0 bg-[#1E1E1E] py-4 border-t border-gray-700`}>
+                    <div className="max-w-[48rem] mx-auto w-full">
                         <ChatInput
                             input={input}
                             setInput={setInput}
