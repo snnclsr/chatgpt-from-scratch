@@ -1,4 +1,6 @@
+import uuid
 import logging
+from typing import List
 
 import asyncio
 from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect
@@ -42,6 +44,60 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Register routes
+app.include_router(router)
+# app.include_router(ws_router, prefix="/api")
+
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: dict[str, list[WebSocket]] = {}
+
+    async def connect(self, websocket: WebSocket) -> str:
+        """Connect a client and return its unique ID"""
+        client_id = str(uuid.uuid4())
+        await websocket.accept()
+        self.active_connections[client_id] = websocket
+        return client_id
+
+    def disconnect(self, client_id: str):
+        """Remove a client from active connections"""
+        if client_id in self.active_connections:
+            del self.active_connections[client_id]
+
+    async def send_personal_message(self, client_id: str, message: dict):
+        """Send a message to a specific client"""
+        if client_id in self.active_connections:
+            await self.active_connections[client_id].send_json(message)
+
+    async def broadcast(self, message: dict, exclude: List[str] = None):
+        """Send a message to all connected clients, optionally excluding some"""
+        exclude = exclude or []
+        for client_id, connection in self.active_connections.items():
+            if client_id not in exclude:
+                await connection.send_json(message)
+
+    async def check_for_stop_command(
+        self, client_id: str, timeout: float = 0.001
+    ) -> bool:
+        """Check if client has sent a stop command with a very short timeout"""
+        if client_id not in self.active_connections:
+            return False
+
+        websocket = self.active_connections[client_id]
+        try:
+            # Non-blocking check for a stop message with a very short timeout
+            data = await asyncio.wait_for(websocket.receive_json(), timeout=timeout)
+            if data.get("command") == "stop":
+                logging.info(f"Generation stopped by client request: {client_id}")
+                return True
+        except asyncio.TimeoutError:
+            # No message received, continue generation
+            pass
+        return False
+
+
+manager = ConnectionManager()
 
 
 # Dependency to get database session
@@ -51,11 +107,6 @@ def get_db():
         yield db
     finally:
         db.close()
-
-
-# Register routes
-app.include_router(router)
-# app.include_router(ws_router, prefix="/api")
 
 
 @app.on_event("startup")
@@ -124,7 +175,8 @@ async def websocket_chat(websocket: WebSocket, model_id: str):
     """Process the request"""
     logger.info(f"WebSocket connection established for model: {model_id}")
 
-    await websocket.accept()
+    client_id = await manager.connect(websocket)
+    logger.info(f"Client connected with ID: {client_id}")
 
     if model_id == "mygpt":
         model = LLMService()
@@ -140,7 +192,7 @@ async def websocket_chat(websocket: WebSocket, model_id: str):
 
             # Get or create default user
             user = user_service.get_or_create_default_user()
-
+            stopped = False
             while True:
                 # Wait for client messages
                 data = await websocket.receive_json()
@@ -196,29 +248,25 @@ async def websocket_chat(websocket: WebSocket, model_id: str):
                             top_p=message.top_p,
                         ):
                             if token.startswith("Error:"):
-                                await websocket.send_json({"error": token})
+                                await manager.send_personal_message(
+                                    client_id, {"error": token}
+                                )
                                 break
 
                             full_response += token
-                            await websocket.send_json({"token": token})
+                            await manager.send_personal_message(
+                                client_id, {"token": token}
+                            )
 
                             # Check after each token if we should continue
                             # This enables immediate cancellation
-                            try:
-                                # Non-blocking check for a stop message with a very short timeout
-                                data = await asyncio.wait_for(
-                                    websocket.receive_json(), timeout=0.001
-                                )
-                                if data.get("command") == "stop":
-                                    logging.info("Generation stopped by client request")
-                                    break
-                            except asyncio.TimeoutError:
-                                # No message received, continue generation
-                                pass
+                            if await manager.check_for_stop_command(client_id):
+                                stopped = True
+                                break
 
-                        # Generation completed successfully
-                        # Store the assistant's response in the database
-                        if full_response:
+                        # Generation completed successfully.
+                        # If the generation was stopped, we don't store the response
+                        if full_response and not stopped:
                             message_service.create_message(
                                 content=full_response,
                                 role="assistant",
@@ -231,7 +279,8 @@ async def websocket_chat(websocket: WebSocket, model_id: str):
                         )
 
                         # Notify client that generation is complete and include conversation data
-                        await websocket.send_json(
+                        await manager.send_personal_message(
+                            client_id,
                             {
                                 "status": "complete",
                                 "conversation": {
@@ -241,26 +290,29 @@ async def websocket_chat(websocket: WebSocket, model_id: str):
                                     # "preview": updated_conversation.preview,
                                     "lastMessageTimestamp": updated_conversation.created_at.isoformat(),
                                 },
-                            }
+                            },
                         )
 
                     except Exception as e:
                         logging.error(f"Error during streaming: {str(e)}")
-                        await websocket.send_json({"error": str(e)})
+                        await manager.send_personal_message(
+                            client_id, {"error": str(e)}
+                        )
 
                 elif command == "stop":
                     # Stop command is handled directly during generation
                     pass
 
                 else:
-                    await websocket.send_json({"error": f"Unknown command: {command}"})
-
+                    await manager.send_personal_message(
+                        client_id, {"error": f"Unknown command: {command}"}
+                    )
     except WebSocketDisconnect:
-        logging.info("WebSocket client disconnected")
-
+        manager.disconnect(client_id)
+        logging.info(f"WebSocket client disconnected: {client_id}")
     except Exception as e:
         logging.error(f"WebSocket error: {str(e)}")
-        await websocket.send_json({"error": str(e)})
+        await manager.send_personal_message(client_id, {"error": str(e)})
 
 
 # @app.websocket("/api/ws/chat")

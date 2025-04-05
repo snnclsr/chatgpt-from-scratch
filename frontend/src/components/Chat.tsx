@@ -210,10 +210,10 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
                     <h2 className="text-xl font-semibold text-gray-200">
                         {chatId ? `Chat ${chatId}` : 'New Chat'}
                     </h2>
-                    <ModelSelector
+                    {/* <ModelSelector
                         selectedModel={selectedModel}
                         onModelChange={setSelectedModel}
-                    />
+                    /> */}
                 </div>
             )}
 

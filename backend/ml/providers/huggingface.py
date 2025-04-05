@@ -76,7 +76,7 @@ class HuggingFaceModel(BaseModelInterface):
 
             # Stream the generated tokens
             for new_text in streamer:
-                print(new_text)
+                # print(new_text)
                 yield new_text
 
             # Wait for the thread to complete
