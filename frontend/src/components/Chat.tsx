@@ -1,16 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Message, Conversation } from '../types';
+import { Message, Conversation, ModelSettings } from '../types';
 import { fetchChatMessages, wsManager } from '../services/api';
+import ModelSelector from './ModelSelector';
 
 interface ChatProps {
     chatId: string | null;
     onConversationUpdate: (conversation: Conversation) => void;
     isSidebarOpen: boolean;
-    modelSettings: {
-        temperature: number;
-        max_length: number;
-        top_p: number;
-    };
+    modelSettings: ModelSettings;
 }
 
 // Input component for both new and existing chats
@@ -110,7 +107,7 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [streamingContent, setStreamingContent] = useState('');
-    // Create a ref to track the current streaming content
+    const [selectedModel, setSelectedModel] = useState('gemma');
     const streamingContentRef = useRef('');
 
     const fetchMessages = async () => {
@@ -150,8 +147,8 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
 
         try {
             const chatIdNumber = chatId ? parseInt(chatId) : undefined;
-            console.log('ws-send-chat-message-payload', content, chatIdNumber, modelSettings);
-            // Use WebSocket implementation with model settings
+            console.log('ws-send-chat-message-payload', content, chatIdNumber, modelSettings, selectedModel);
+            // Use WebSocket implementation with model settings and selected model
             wsManager.sendChatMessage(
                 content,
                 (token) => {
@@ -187,7 +184,10 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
                     setIsLoading(false);
                 },
                 chatIdNumber,
-                modelSettings
+                {
+                    ...modelSettings,
+                    model: selectedModel
+                }
             );
 
         } catch (error) {
@@ -206,10 +206,14 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
     return (
         <div className="h-full flex flex-col">
             {!isNewChat && (
-                <div className="max-w-[48rem] mx-auto w-full px-4">
-                    <h2 className="text-xl font-semibold mb-4 text-gray-200">
+                <div className="max-w-[48rem] mx-auto w-full px-4 py-4 flex justify-between items-center">
+                    <h2 className="text-xl font-semibold text-gray-200">
                         {chatId ? `Chat ${chatId}` : 'New Chat'}
                     </h2>
+                    <ModelSelector
+                        selectedModel={selectedModel}
+                        onModelChange={setSelectedModel}
+                    />
                 </div>
             )}
 

@@ -2,17 +2,18 @@ import React, { useState, useCallback } from 'react';
 import { Chat } from './components/Chat';
 import { Sidebar } from './components/Sidebar';
 import { ModelSettings } from './components/ModelSettings';
-import { Conversation } from './types';
+import { Conversation, ModelSettings as ModelSettingsType } from './types';
 
 function App() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [currentChatId, setCurrentChatId] = useState<string | null>(null);
     const [conversations, setConversations] = useState<Conversation[]>([]);
-    const [modelSettings, setModelSettings] = useState({
+    const [modelSettings, setModelSettings] = useState<ModelSettingsType>({
         temperature: 0.7,
         max_length: 25,
-        top_p: 0.9
+        top_p: 0.9,
+        model: 'qwen-instruct'
     });
 
     const updateConversations = useCallback((newConversation: Conversation) => {

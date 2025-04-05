@@ -34,7 +34,9 @@ export class WebSocketChatManager {
         }
 
         // Create WebSocket connection
-        const wsUrl = `${API_BASE_URL.replace('http', 'ws')}/ws/chat`;
+        // qwen-instruct
+        // const wsUrl = `${API_BASE_URL.replace('http', 'ws')}/ws/qwen-instruct`;
+        const wsUrl = `${API_BASE_URL.replace('http', 'ws')}/ws/gemma-3-1b-it`;
         this.ws = new WebSocket(wsUrl);
 
         this.ws.onopen = () => {
@@ -100,7 +102,7 @@ export class WebSocketChatManager {
         onComplete: (response: any) => void,
         onError: (error: string) => void,
         chatId?: number,
-        options = { temperature: 0.7, max_length: 25, top_p: 0.9 }
+        options = { temperature: 0.7, max_length: 25, top_p: 0.9, model: 'mygpt' }
     ): void {
         // Set callbacks
         this.onTokenCallback = onToken;
@@ -120,7 +122,7 @@ export class WebSocketChatManager {
     private sendMessageToServer(
         content: string,
         chatId?: number,
-        options = { temperature: 0.7, max_length: 25, top_p: 0.9 }
+        options = { temperature: 0.7, max_length: 25, top_p: 0.9, model: 'mygpt' }
     ): void {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
             if (this.onErrorCallback) {
@@ -135,7 +137,8 @@ export class WebSocketChatManager {
             chat_id: chatId,
             temperature: options.temperature,
             max_length: options.max_length,
-            top_p: options.top_p
+            top_p: options.top_p,
+            model: options.model
         };
         console.log('client-ws-to-server-payload', payload);
 

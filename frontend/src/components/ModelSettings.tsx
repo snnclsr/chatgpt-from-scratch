@@ -1,18 +1,11 @@
 import React from 'react';
+import { ModelSettings as ModelSettingsType } from '../types';
 
 interface ModelSettingsProps {
     isOpen: boolean;
     onClose: () => void;
-    settings: {
-        temperature: number;
-        max_length: number;
-        top_p: number;
-    };
-    onSettingsChange: (settings: {
-        temperature: number;
-        max_length: number;
-        top_p: number;
-    }) => void;
+    settings: ModelSettingsType;
+    onSettingsChange: (settings: ModelSettingsType) => void;
 }
 
 export function ModelSettings({ isOpen, onClose, settings, onSettingsChange }: ModelSettingsProps) {
@@ -36,6 +29,22 @@ export function ModelSettings({ isOpen, onClose, settings, onSettingsChange }: M
                 </div>
 
                 <div className="space-y-6">
+                    <div>
+                        <label className="block text-sm text-gray-300 mb-2">Model</label>
+                        <select
+                            value={settings.model}
+                            onChange={(e) => onSettingsChange({
+                                ...settings,
+                                model: e.target.value
+                            })}
+                            className="w-full bg-[#40414F] text-white rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-600"
+                        >
+                            <option value="mygpt">MyGPT</option>
+                            <option value="gemma">Gemma</option>
+                            <option value="qwen-instruct">Qwen</option>
+                        </select>
+                    </div>
+
                     <div>
                         <label className="block text-sm text-gray-300 mb-2">
                             Temperature: {settings.temperature.toFixed(2)}
