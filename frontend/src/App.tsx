@@ -11,7 +11,7 @@ function App() {
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [modelSettings, setModelSettings] = useState<ModelSettingsType>({
         temperature: 0.7,
-        max_length: 25,
+        max_length: 100,
         top_p: 0.9,
         model: 'qwen-instruct'
     });

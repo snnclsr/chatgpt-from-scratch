@@ -77,7 +77,9 @@ class HuggingFaceModel(BaseModelInterface):
 
             # Stream the generated tokens
             for new_text in streamer:
-                # print(new_text)
+                if new_text.endswith(self.tokenizer.eos_token):
+                    yield new_text.rstrip(self.tokenizer.eos_token)
+                    break
                 yield new_text
 
             # Wait for the thread to complete

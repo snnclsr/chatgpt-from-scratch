@@ -43,9 +43,8 @@ class ConversationService:
             return " ".join(words[:3]) + "..."
         return f"{random.choice(self.ADJECTIVES)} {random.choice(self.TOPICS)}"
 
-    def create_conversation(self, user_id: int, initial_message: str) -> Conversation:
+    def create_conversation(self, user_id: int, title: str) -> Conversation:
         """Create a new conversation with a generated title"""
-        title = self.generate_title(initial_message)
         return self.repository.create(title=title, user_id=user_id)
 
     def get_conversation(self, conversation_id: int) -> Union[Conversation, None]:

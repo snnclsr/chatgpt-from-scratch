@@ -21,7 +21,7 @@ MODEL_CONFIGS: Dict[str, Dict[str, Any]] = {
         # "model_name": "google/gemma-3-1b-it",
         "model_name": "/Users/sinan/Desktop/repos/chatgpt-from-scratch/backend/gemma-3-1b-it",
         "generation_params": {
-            "max_new_tokens": 100,
+            # "max_new_tokens": 100,
             "temperature": 0.7,
             "top_p": 0.9,
             "do_sample": True,
@@ -31,7 +31,7 @@ MODEL_CONFIGS: Dict[str, Dict[str, Any]] = {
         "type": "huggingface",
         "model_name": "Qwen/Qwen2.5-0.5B-Instruct",
         "generation_params": {
-            "max_new_tokens": 100,
+            # "max_new_tokens": 100,
             "temperature": 0.7,
             "top_p": 0.9,
             "do_sample": True,
@@ -53,7 +53,7 @@ MODEL_CONFIGS: Dict[str, Dict[str, Any]] = {
 
 # Default parameters for text generation
 DEFAULT_GENERATION_PARAMS: Dict[str, Any] = {
-    "max_new_tokens": 100,
+    # "max_new_tokens": 100,
     "temperature": 0.7,
     "top_p": 0.9,
     "do_sample": True,

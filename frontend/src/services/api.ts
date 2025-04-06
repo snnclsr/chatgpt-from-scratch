@@ -35,8 +35,8 @@ export class WebSocketChatManager {
 
         // Create WebSocket connection
         // qwen-instruct
-        // const wsUrl = `${API_BASE_URL.replace('http', 'ws')}/ws/qwen-instruct`;
-        const wsUrl = `${API_BASE_URL.replace('http', 'ws')}/ws/gemma-3-1b-it`;
+        const wsUrl = `${API_BASE_URL.replace('http', 'ws')}/ws/qwen-instruct`;
+        // const wsUrl = `${API_BASE_URL.replace('http', 'ws')}/ws/gemma-3-1b-it`;
         this.ws = new WebSocket(wsUrl);
 
         this.ws.onopen = () => {

@@ -1,6 +1,7 @@
 import uuid
 import logging
 from itertools import groupby
+from contextlib import asynccontextmanager
 from typing import List, Dict, Any
 
 import asyncio
@@ -35,7 +36,23 @@ logger = logging.getLogger(__name__)
 # Create database tables
 models.Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="AI Chat System")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Register all models from config
+    for model_id, config in MODEL_CONFIGS.items():
+        logger.info(f"Registering model: {model_id}")
+        await ModelFactory.get_model(model_id)
+        # ModelFactory.register_model(model_id, config)
+
+    yield
+
+    # Clean up
+    for model_id in MODEL_CONFIGS.keys():
+        await ModelFactory.unload_model(model_id)
+
+
+app = FastAPI(title="AI Chat System", lifespan=lifespan)
 
 # CORS middleware setup
 app.add_middleware(
@@ -108,15 +125,6 @@ def get_db():
         yield db
     finally:
         db.close()
-
-
-@app.on_event("startup")
-async def startup_event():
-    # Register all models from config
-    for model_id, config in MODEL_CONFIGS.items():
-        logger.info(f"Registering model: {model_id}")
-        await ModelFactory.get_model(model_id)
-        # ModelFactory.register_model(model_id, config)
 
 
 # @app.get("/")
@@ -196,7 +204,7 @@ async def websocket_chat(websocket: WebSocket, model_id: str):
     try:
         # Use context manager instead of manual DB session management
         with get_db_context() as db:
-            chat_service = ChatService(db)
+            # chat_service = ChatService(db)
             user_service = UserService(db)
             conversation_service = ConversationService(db)
             message_service = MessageService(db)
@@ -205,7 +213,7 @@ async def websocket_chat(websocket: WebSocket, model_id: str):
             user = user_service.get_or_create_default_user()
             stopped = False
             while True:
-                # Wait for client messages
+                # data = await manager.receive_message(client_id)
                 data = await websocket.receive_json()
                 command = data.get("command", "")
 
@@ -219,13 +227,35 @@ async def websocket_chat(websocket: WebSocket, model_id: str):
                             message.chat_id
                         )
                         if not conversation:
-                            await websocket.send_json(
-                                {"error": "Conversation not found"}
+                            await manager.send_personal_message(
+                                client_id, {"error": "Conversation not found"}
                             )
                             continue
                     else:
+                        # Title summarizer with Qwen
+                        title = ""
+                        title_messages = [
+                            {
+                                "role": "system",
+                                "content": """You are a helpful assistant that summarizes conversations in less than 30 characters.""",
+                            },
+                            {
+                                "role": "user",
+                                "content": message.message,
+                            },
+                        ]
+                        async for token in model.generate_stream(
+                            prompt=title_messages,
+                            # max_length=250,
+                            max_new_tokens=40,
+                            temperature=0.3,
+                        ):
+                            title += token
+                        logger.info(f"Generated title: {title}")
+                        # First message, create a new conversation
+                        # title = message.message[:35]
                         conversation = conversation_service.create_conversation(
-                            user.id, message.message
+                            user.id, title
                         )
 
                     # Store user message
@@ -262,7 +292,8 @@ async def websocket_chat(websocket: WebSocket, model_id: str):
                     try:
                         async for token in model.generate_stream(
                             prompt=previous_messages,
-                            max_length=message.max_length,
+                            # max_length=message.max_length,
+                            max_new_tokens=message.max_length,
                             temperature=message.temperature,
                             top_p=message.top_p,
                         ):
