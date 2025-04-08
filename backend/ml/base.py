@@ -25,3 +25,18 @@ class BaseModelInterface(ABC):
     def model_info(self) -> Dict[str, Any]:
         """Return model information"""
         pass
+
+
+class VisionModelInterface(BaseModelInterface):
+    @abstractmethod
+    async def generate_stream_with_image(
+        self, prompt: str, image_path: str, **params: Dict[str, Any]
+    ) -> AsyncGenerator[str, None]:
+        """Stream generated tokens based on text and image input"""
+        pass
+
+    @property
+    @abstractmethod
+    def supports_vision(self) -> bool:
+        """Returns whether this model supports vision capabilities"""
+        return True

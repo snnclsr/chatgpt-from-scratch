@@ -38,5 +38,8 @@ class Message(Base):
     role = Column(String(50), nullable=False)  # 'user' or 'assistant'
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=False)
+    image_url = Column(
+        String(500), nullable=True
+    )  # Store URL or path to uploaded image
 
     conversation = relationship("Conversation", back_populates="messages")

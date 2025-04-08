@@ -8,6 +8,9 @@ class ChatInput(BaseModel):
     chat_id: Optional[int] = Field(
         None, description="The ID of the existing conversation"
     )
+    image_url: Optional[str] = Field(
+        None, description="URL or path to an uploaded image"
+    )
 
 
 class StreamingChatInput(ChatInput):
@@ -28,6 +31,18 @@ class WebSocketChatInput(StreamingChatInput):
     )
 
 
+class WebSocketVisionChatInput(WebSocketChatInput):
+    image_url: str = Field(..., description="URL or path to the uploaded image")
+
+
+class MessageResponse(BaseModel):
+    id: str
+    content: str
+    role: str
+    timestamp: datetime
+    image_url: Optional[str] = None
+
+
 class ConversationResponse(BaseModel):
     id: int
     title: str
@@ -39,6 +54,13 @@ class ChatResponse(BaseModel):
     response: str = Field(..., description="The response from the assistant")
     message_id: int = Field(..., description="The ID of the assistant's message")
     conversation: ConversationResponse = Field(..., description="The conversation data")
+
+
+class ImageUploadResponse(BaseModel):
+    success: bool
+    message: str
+    image_url: Optional[str] = None
+    conversation_id: Optional[int] = None
 
 
 class HealthResponse(BaseModel):

@@ -3,10 +3,12 @@ import logging
 from itertools import groupby
 from contextlib import asynccontextmanager
 from typing import List, Dict, Any
+import os
 
 import asyncio
 from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 from app.api.routes import router
@@ -16,6 +18,7 @@ from app.schemas import (
     ConversationResponse,
     HealthResponse,
     WebSocketChatInput,
+    WebSocketVisionChatInput,
 )
 from app.services.chat_service import ChatService
 from app.services.conversation_service import ConversationService
@@ -26,6 +29,7 @@ from app.services.llm_service import LLMService
 
 from ml.factory import ModelFactory
 from ml.config import MODEL_CONFIGS
+from app.utils.image_utils import UPLOADS_DIR, ensure_upload_dir
 
 # Configure logging
 logging.basicConfig(
@@ -35,6 +39,9 @@ logger = logging.getLogger(__name__)
 
 # Create database tables
 models.Base.metadata.create_all(bind=engine)
+
+# Ensure the uploads directory exists
+ensure_upload_dir()
 
 
 @asynccontextmanager
@@ -63,7 +70,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 # Register routes
-app.include_router(router)
+app.include_router(router, prefix="/api")
+
+# Mount the uploads directory for static file access
+app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 # app.include_router(ws_router, prefix="/api")
 
 
@@ -125,16 +135,6 @@ def get_db():
         yield db
     finally:
         db.close()
-
-
-# @app.get("/")
-# async def root():
-#     return {
-#         "status": "running",
-#         "version": "1.0.0",
-#         "docs_url": "/docs",
-#         "models_url": "/api/models",
-#     }
 
 
 @app.get("/api/chat/{chat_id}/messages")
@@ -365,140 +365,162 @@ async def websocket_chat(websocket: WebSocket, model_id: str):
         await manager.send_personal_message(client_id, {"error": str(e)})
 
 
-# @app.websocket("/api/ws/chat")
-# async def websocket_chat(websocket: WebSocket):
-#     """WebSocket endpoint for chat streaming"""
-#     await websocket.accept()
+@app.websocket("/api/ws/vision/{model_id}")
+async def websocket_vision_chat(websocket: WebSocket, model_id: str):
+    """Handle vision model interactions"""
+    logger.info(f"Vision WebSocket connection established for model: {model_id}")
 
-#     try:
-#         # Use context manager instead of manual DB session management
-#         with get_db_context() as db:
-#             chat_service = ChatService(db)
-#             user_service = UserService(db)
-#             conversation_service = ConversationService(db)
-#             message_service = MessageService(db)
-#             llm_service = LLMService()
+    client_id = await manager.connect(websocket)
+    logger.info(f"Vision client connected with ID: {client_id}")
 
-#             # Get or create default user
-#             user = user_service.get_or_create_default_user()
+    # Check if model supports vision
+    is_vision_model = ModelFactory.is_vision_model(model_id)
+    if not is_vision_model:
+        await manager.send_personal_message(
+            client_id,
+            {
+                "type": "error",
+                "message": f"Model {model_id} does not support vision capabilities",
+            },
+        )
+        manager.disconnect(client_id)
+        return
 
-#             while True:
-#                 # Wait for client messages
-#                 data = await websocket.receive_json()
-#                 command = data.get("command", "")
+    # Get the vision model
+    model = await ModelFactory.get_model(model_id)
 
-#                 if command == "generate":
-#                     # Start a new generation
-#                     message = WebSocketChatInput(**data)
+    try:
+        with get_db_context() as db:
+            user_service = UserService(db)
+            conversation_service = ConversationService(db)
+            message_service = MessageService(db)
 
-#                     # Get or create conversation
-#                     if message.chat_id:
-#                         conversation = conversation_service.get_conversation(
-#                             message.chat_id
-#                         )
-#                         if not conversation:
-#                             await websocket.send_json(
-#                                 {"error": "Conversation not found"}
-#                             )
-#                             continue
-#                     else:
-#                         conversation = conversation_service.create_conversation(
-#                             user.id, message.message
-#                         )
+            # Get or create default user
+            user = user_service.get_or_create_default_user()
+            stopped = False
 
-#                     # Store user message
-#                     message_service.create_message(
-#                         content=message.message,
-#                         role="user",
-#                         conversation_id=conversation.id,
-#                     )
+            while not stopped:
+                try:
+                    # Wait for a message from the client
+                    data = await websocket.receive_json()
 
-#                     # Get conversation history for context
-#                     previous_messages = message_service.get_conversation_messages(
-#                         conversation.id
-#                     )
+                    # Parse the user's message with image
+                    request = WebSocketVisionChatInput(**data)
 
-#                     # Format the prompt including conversation history
-#                     formatted_prompt = chat_service._format_conversation_for_model(
-#                         previous_messages
-#                     )
-#                     logging.info(f"Formatted prompt: {formatted_prompt}")
-#                     logging.info(
-#                         f"Model settings - Temperature: {message.temperature}, Max Length: {message.max_length}, Top P: {message.top_p}"
-#                     )
-#                     # Start token generation
-#                     full_response = ""
+                    if request.command == "stop":
+                        logger.info(
+                            f"Received stop command from vision client: {client_id}"
+                        )
+                        stopped = True
+                        break
 
-#                     try:
-#                         async for token in llm_service.generate_stream(
-#                             prompt=formatted_prompt,
-#                             max_length=message.max_length,
-#                             temperature=message.temperature,
-#                             top_p=message.top_p,
-#                         ):
-#                             if token.startswith("Error:"):
-#                                 await websocket.send_json({"error": token})
-#                                 break
+                    # Get or create conversation
+                    if request.chat_id:
+                        conversation = conversation_service.get_conversation(
+                            request.chat_id
+                        )
+                        if not conversation:
+                            raise HTTPException(
+                                status_code=404, detail="Conversation not found"
+                            )
+                    else:
+                        # Create a new vision conversation
+                        conversation = conversation_service.create_conversation(
+                            title="Vision Chat",
+                            user_id=user.id,
+                        )
 
-#                             full_response += token
-#                             await websocket.send_json({"token": token})
+                    # Get full image path
+                    image_path = os.path.join(UPLOADS_DIR, request.image_url)
+                    if not os.path.exists(image_path):
+                        raise FileNotFoundError(f"Image not found: {image_path}")
 
-#                             # Check after each token if we should continue
-#                             # This enables immediate cancellation
-#                             try:
-#                                 # Non-blocking check for a stop message with a very short timeout
-#                                 data = await asyncio.wait_for(
-#                                     websocket.receive_json(), timeout=0.001
-#                                 )
-#                                 if data.get("command") == "stop":
-#                                     logging.info("Generation stopped by client request")
-#                                     break
-#                             except asyncio.TimeoutError:
-#                                 # No message received, continue generation
-#                                 pass
+                    # Save user message to database with image URL
+                    user_message = message_service.create_message(
+                        content=request.message,
+                        role="user",
+                        conversation_id=conversation.id,
+                        image_url=request.image_url,
+                    )
 
-#                         # Generation completed successfully
-#                         # Store the assistant's response in the database
-#                         if full_response:
-#                             message_service.create_message(
-#                                 content=full_response,
-#                                 role="assistant",
-#                                 conversation_id=conversation.id,
-#                             )
+                    # # Create an empty assistant message that we'll update as tokens come in
+                    # assistant_message = message_service.create_message(
+                    #     content="",  # Empty content to start
+                    #     role="assistant",
+                    #     conversation_id=conversation.id,
+                    # )
 
-#                         # Get the updated conversation to include in the response
-#                         updated_conversation = conversation_service.get_conversation(
-#                             conversation.id
-#                         )
+                    # # Send initial message to acknowledge we're processing
+                    # await manager.send_personal_message(
+                    #     client_id,
+                    #     {
+                    #         "type": "start",
+                    #         "message_id": assistant_message.id,
+                    #         "conversation_id": conversation.id,
+                    #     },
+                    # )
 
-#                         # Notify client that generation is complete and include conversation data
-#                         await websocket.send_json(
-#                             {
-#                                 "status": "complete",
-#                                 "conversation": {
-#                                     "id": updated_conversation.id,
-#                                     "title": updated_conversation.title,
-#                                     "created_at": updated_conversation.created_at.isoformat(),
-#                                     # "preview": updated_conversation.preview,
-#                                     "lastMessageTimestamp": updated_conversation.created_at.isoformat(),
-#                                 },
-#                             }
-#                         )
+                    # Stream the response using image and prompt
+                    full_response = ""
+                    async for token in model.generate_stream_with_image(
+                        request.message, image_path
+                    ):
+                        full_response += token
 
-#                     except Exception as e:
-#                         logging.error(f"Error during streaming: {str(e)}")
-#                         await websocket.send_json({"error": str(e)})
+                        # Check for stop command
+                        if await manager.check_for_stop_command(client_id):
+                            logger.info("Vision generation stopped by client request")
+                            break
 
-#                 elif command == "stop":
-#                     # Stop command is handled directly during generation
-#                     pass
+                        # Send token to the client
+                        await manager.send_personal_message(
+                            client_id,
+                            {
+                                "type": "token",
+                                "token": token,
+                                # "message_id": assistant_message.id,
+                            },
+                        )
 
-#                 else:
-#                     await websocket.send_json({"error": f"Unknown command: {command}"})
+                    # Update the message in the database with the full response
+                    # message_service.repository.update(
+                    #     assistant_message.id, content=full_response
+                    # )
 
-#     except WebSocketDisconnect:
-#         logging.info("WebSocket client disconnected")
+                    # Send completion message
+                    await manager.send_personal_message(
+                        client_id,
+                        {
+                            "type": "end",
+                            # "message_id": assistant_message.id,
+                        },
+                    )
 
-#     except Exception as e:
-#         logging.error(f"WebSocket error: {str(e)}")
-#         await websocket.send_json({"error": str(e)})
+                except WebSocketDisconnect:
+                    logger.info(f"Vision client disconnected: {client_id}")
+                    stopped = True
+                    break
+                except Exception as e:
+                    logger.error(f"Error processing vision request: {str(e)}")
+                    # Try to send error to client
+                    try:
+                        await manager.send_personal_message(
+                            client_id, {"type": "error", "message": str(e)}
+                        )
+                    except:
+                        pass
+
+        # Clean up
+        manager.disconnect(client_id)
+        logger.info(f"Vision client connection closed: {client_id}")
+
+    except Exception as e:
+        logger.error(f"Vision WebSocket error: {str(e)}")
+        # Try to send error to client
+        try:
+            await manager.send_personal_message(
+                client_id, {"type": "error", "message": str(e)}
+            )
+        except:
+            pass
+        manager.disconnect(client_id)

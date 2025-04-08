@@ -1,7 +1,8 @@
 from typing import Dict, List, Any
 import logging
-from .base import BaseModelInterface
+from .base import BaseModelInterface, VisionModelInterface
 from .providers.huggingface import HuggingFaceModel
+from .providers.vision_huggingface import VisionHuggingFaceModel
 from .config import MODEL_CONFIGS
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,10 @@ class ModelFactory:
                 model = HuggingFaceModel(config["model_name"], config)
                 await model.load_model()
                 cls._models[model_id] = model
+            elif model_type == "vision_huggingface":
+                model = VisionHuggingFaceModel(config["model_name"], config)
+                await model.load_model()
+                cls._models[model_id] = model
             else:
                 raise ValueError(f"Unsupported model type: {model_type}")
 
@@ -45,6 +50,8 @@ class ModelFactory:
                 del model.model
             if hasattr(model, "tokenizer"):
                 del model.tokenizer
+            if hasattr(model, "processor"):
+                del model.processor
             del cls._models[model_id]
             logger.info(f"Unloaded model {model_id}")
 
@@ -58,3 +65,14 @@ class ModelFactory:
                 info.update(cls._models[model_id].model_info)
             models_info.append(info)
         return models_info
+
+    @classmethod
+    def is_vision_model(cls, model_id: str) -> bool:
+        """Check if a model supports vision capabilities"""
+        if model_id in cls._models:
+            model = cls._models[model_id]
+            return isinstance(model, VisionModelInterface) and model.supports_vision
+        elif model_id in cls._model_configs:
+            config = cls._model_configs[model_id]
+            return config.get("type") == "vision_huggingface"
+        return False
