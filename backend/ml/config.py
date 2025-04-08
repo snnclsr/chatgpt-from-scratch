@@ -25,7 +25,8 @@ MODEL_CONFIGS: Dict[str, Dict[str, Any]] = {
         #     "device_map": "auto",
         # },
     },
-    "SmolVLM-256M-Instruct": {
+    "smolvlm": {
+        # SmolVLM-256M-Instruct
         "type": "vision_huggingface",
         # "model_name": "SmolVLM/SmolVLM-256M-Instruct",
         "model_name": "/Users/sinan/Desktop/repos/chatgpt-from-scratch/backend/SmolVLM-256M-Instruct",

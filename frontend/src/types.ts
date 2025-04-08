@@ -3,6 +3,7 @@ export interface Message {
     content: string;
     role: 'user' | 'assistant';
     timestamp: string;
+    image_url?: string;
 }
 
 export interface Conversation {

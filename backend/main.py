@@ -375,6 +375,7 @@ async def websocket_vision_chat(websocket: WebSocket, model_id: str):
 
     # Check if model supports vision
     is_vision_model = ModelFactory.is_vision_model(model_id)
+    print(f"Is vision model: {is_vision_model}")
     if not is_vision_model:
         await manager.send_personal_message(
             client_id,
@@ -388,6 +389,14 @@ async def websocket_vision_chat(websocket: WebSocket, model_id: str):
 
     # Get the vision model
     model = await ModelFactory.get_model(model_id)
+    print(f"Vision model: {model}")
+    print(f"Model ID: {model_id}")
+    print("Starting vision chat...")
+
+    async def fake_token_stream(tokens):
+        for token in tokens:
+            yield token
+            await asyncio.sleep(0)  # Simulate async behavior
 
     try:
         with get_db_context() as db:
@@ -462,6 +471,37 @@ async def websocket_vision_chat(websocket: WebSocket, model_id: str):
 
                     # Stream the response using image and prompt
                     full_response = ""
+                    print("Generating response...")
+                    # Fake response for now.
+                    # tokens = [
+                    #     "Hello ",
+                    #     "world ",
+                    #     "!",
+                    #     "This ",
+                    #     "is ",
+                    #     "a ",
+                    #     "test",
+                    #     "This ",
+                    #     "is ",
+                    #     "a ",
+                    #     "test",
+                    # ]
+                    # async for token in fake_token_stream(tokens):
+                    #     if token.startswith("Error:"):
+                    #         await manager.send_personal_message(
+                    #             client_id, {"error": token}
+                    #         )
+                    #         break
+
+                    #     full_response += token
+                    #     await manager.send_personal_message(client_id, {"token": token})
+
+                    #     # Check after each token if we should continue
+                    #     # This enables immediate cancellation
+                    #     if await manager.check_for_stop_command(client_id):
+                    #         stopped = True
+                    #         break
+
                     async for token in model.generate_stream_with_image(
                         request.message, image_path
                     ):
@@ -470,6 +510,7 @@ async def websocket_vision_chat(websocket: WebSocket, model_id: str):
                         # Check for stop command
                         if await manager.check_for_stop_command(client_id):
                             logger.info("Vision generation stopped by client request")
+                            stopped = True
                             break
 
                         # Send token to the client
@@ -482,17 +523,31 @@ async def websocket_vision_chat(websocket: WebSocket, model_id: str):
                             },
                         )
 
-                    # Update the message in the database with the full response
-                    # message_service.repository.update(
-                    #     assistant_message.id, content=full_response
-                    # )
+                    # Generation completed successfully.
+                    # If the generation was stopped, we don't store the response
+                    if full_response and not stopped:
+                        message_service.create_message(
+                            content=full_response,
+                            role="assistant",
+                            conversation_id=conversation.id,
+                        )
 
-                    # Send completion message
+                    # Get the updated conversation to include in the response
+                    updated_conversation = conversation_service.get_conversation(
+                        conversation.id
+                    )
+
                     await manager.send_personal_message(
                         client_id,
                         {
-                            "type": "end",
-                            # "message_id": assistant_message.id,
+                            "status": "complete",
+                            "conversation": {
+                                "id": updated_conversation.id,
+                                "title": updated_conversation.title,
+                                "created_at": updated_conversation.created_at.isoformat(),
+                                # "preview": updated_conversation.preview,
+                                "lastMessageTimestamp": updated_conversation.created_at.isoformat(),
+                            },
                         },
                     )
 
