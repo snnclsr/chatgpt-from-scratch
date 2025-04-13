@@ -1,7 +1,8 @@
-from fastapi import APIRouter, File, UploadFile, HTTPException, Form, Depends
-from sqlalchemy.orm import Session
-from typing import List, Optional
 import os
+from typing import Optional
+
+from fastapi import APIRouter, File, UploadFile, HTTPException, Form
+
 from ..schemas import ImageUploadResponse
 from ..utils.image_utils import save_uploaded_image
 from ..database import get_db_context

@@ -4,7 +4,6 @@ from sqlalchemy.ext.declarative import declarative_base
 import os
 from contextlib import contextmanager
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from typing import AsyncGenerator
 
 # Get the directory where this file is located
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
@@ -47,6 +46,15 @@ def get_db_context():
         with get_db_context() as db:
             # use db session
     """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# Dependency to get database session
+def get_db():
     db = SessionLocal()
     try:
         yield db

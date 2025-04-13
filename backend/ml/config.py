@@ -4,7 +4,7 @@ MODEL_CONFIGS: Dict[str, Dict[str, Any]] = {
     # "gemma-3-1b-it": {
     #     "type": "huggingface",
     #     # "model_name": "google/gemma-3-1b-it",
-    #     "model_name": "/Users/sinan/Desktop/repos/chatgpt-from-scratch/backend/gemma-3-1b-it",
+    #     "model_name": "/Users/sinan/Desktop/repos/chatgpt-from-scratch/backend/models/gemma-3-1b-it",
     #     "generation_params": {
     #         # "max_new_tokens": 100,
     #         "temperature": 0.7,
@@ -29,7 +29,7 @@ MODEL_CONFIGS: Dict[str, Dict[str, Any]] = {
         # SmolVLM-256M-Instruct
         "type": "vision_huggingface",
         # "model_name": "SmolVLM/SmolVLM-256M-Instruct",
-        "model_name": "/Users/sinan/Desktop/repos/chatgpt-from-scratch/backend/SmolVLM-256M-Instruct",
+        "model_name": "/Users/sinan/Desktop/repos/chatgpt-from-scratch/backend/models/SmolVLM-256M-Instruct",
         "generation_params": {
             "temperature": 0.7,
             "max_new_tokens": 30,

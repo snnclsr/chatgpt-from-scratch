@@ -1,6 +1,7 @@
 from typing import AsyncGenerator, Dict, Any, Optional
 import logging
-from app.ml.model_interface import ModelInterface
+
+from ..my_ml.model_interface import ModelInterface
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

@@ -1,5 +1,4 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
 from typing import List, Tuple, Union
 from .base import BaseRepository
 from ..models import Conversation, Message
