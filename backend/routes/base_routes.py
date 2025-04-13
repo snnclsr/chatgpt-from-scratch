@@ -3,18 +3,24 @@ from typing import Optional
 
 from fastapi import APIRouter, File, UploadFile, HTTPException, Form
 
-from ..schemas import ImageUploadResponse
+from ..schemas import ImageUploadResponse, HealthResponse
 from ..utils.image_utils import save_uploaded_image
 from ..database import get_db_context
 from ..services.user_service import UserService
 from ..services.conversation_service import ConversationService
 
-router = APIRouter()
+router = APIRouter(prefix="/api")
 
 
 @router.get("/")
 async def root():
     return {"message": "Welcome to AI Chat API"}
+
+
+@router.get("/health", response_model=HealthResponse)
+async def health_check():
+    """Health check endpoint"""
+    return HealthResponse(status="ok")
 
 
 @router.post("/upload-image", response_model=ImageUploadResponse)

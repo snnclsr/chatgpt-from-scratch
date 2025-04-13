@@ -25,5 +25,7 @@ __pycache__/
 PRD.md
 project_structure.md
 gpt2-small-*
-chat.db
+*.db
 backend/models/
+backend/my-ml/gpt2-small-124M.pth
+backend/uploads/

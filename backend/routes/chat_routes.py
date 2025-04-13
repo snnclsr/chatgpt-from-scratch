@@ -10,13 +10,13 @@ from ..services.user_service import UserService
 
 
 router = APIRouter(
-    # prefix="/",
+    prefix="/api",
     tags=["chat"],
     responses={404: {"description": "Not found"}},
 )
 
 
-@router.get("/api/chat/{chat_id}/messages")
+@router.get("/chat/{chat_id}/messages")
 async def get_chat_messages(chat_id: int, db: Session = Depends(get_db)):
     """Get all messages for a specific chat"""
     try:
@@ -27,7 +27,7 @@ async def get_chat_messages(chat_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/api/conversations", response_model=List[ConversationResponse])
+@router.get("/conversations", response_model=List[ConversationResponse])
 async def get_conversations(db: Session = Depends(get_db)):
     """Get all conversations for the current user"""
     try:
@@ -40,7 +40,7 @@ async def get_conversations(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/api/conversations/{conversation_id}")
+@router.delete("/conversations/{conversation_id}")
 async def delete_conversation(conversation_id: int, db: Session = Depends(get_db)):
     """Delete a specific conversation"""
     try:

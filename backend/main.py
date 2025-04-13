@@ -7,7 +7,6 @@ from fastapi.staticfiles import StaticFiles
 
 from . import models
 from .database import engine
-from .schemas import HealthResponse
 
 from .routes.base_routes import router as base_router
 from .routes.chat_routes import router as chat_router
@@ -57,16 +56,10 @@ app.add_middleware(
 )
 
 # Register routes
-app.include_router(base_router, prefix="/api")
-app.include_router(chat_router)  # prefix="/api/chat"
-app.include_router(ws_chat_router)  # prefix="/api/ws"
-app.include_router(ws_vision_router)  # prefix="/api/ws/vision"
+app.include_router(base_router)
+app.include_router(chat_router)
+app.include_router(ws_chat_router)
+app.include_router(ws_vision_router)
 
 # Mount the uploads directory for static file access
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
-
-
-@app.get("/api/health", response_model=HealthResponse)
-async def health_check():
-    """Health check endpoint"""
-    return HealthResponse(status="ok")
