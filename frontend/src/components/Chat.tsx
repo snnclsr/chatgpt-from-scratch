@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Message, Conversation, ModelSettings } from '../types';
 import { fetchChatMessages, wsManager, wsVisionManager, API_BASE_URL } from '../services/api';
-import ModelSelector from './ModelSelector';
 import ImageUpload from './ImageUpload';
 
 interface ChatProps {
@@ -9,6 +8,7 @@ interface ChatProps {
     onConversationUpdate: (conversation: Conversation) => void;
     isSidebarOpen: boolean;
     modelSettings: ModelSettings;
+    onSettingsChange: (settings: ModelSettings) => void;
 }
 
 // Input component for both new and existing chats
@@ -51,12 +51,17 @@ const ChatInput = ({
         }
     }, [selectedImageFile]);
 
+    const handleFormSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (input.trim() || selectedImageFile) {
+            sendMessage(input);
+            setInput(''); // Clear input field immediately after submission
+        }
+    };
+
     return (
         <form
-            onSubmit={(e) => {
-                e.preventDefault();
-                sendMessage(input);
-            }}
+            onSubmit={handleFormSubmit}
             className={`mx-4 ${className}`}
         >
             <div className="flex flex-col bg-[#40414F] p-4 rounded-lg shadow-lg border border-gray-900/50">
@@ -69,6 +74,7 @@ const ChatInput = ({
                             className="max-w-full max-h-48 rounded"
                         />
                         <button
+                            type="button"
                             onClick={(e) => {
                                 e.preventDefault();
                                 clearSelectedImage();
@@ -99,7 +105,7 @@ const ChatInput = ({
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         className="flex-1 bg-transparent text-white placeholder-gray-400 focus:outline-none"
-                        placeholder={selectedImageFile ? "Ask about this image..." : "Type your message..."}
+                        placeholder={"Type your message..."}
                         disabled={isLoading}
                     />
 
@@ -160,16 +166,23 @@ const NewConversation = ({
     );
 };
 
-export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSidebarOpen, modelSettings }) => {
+export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSidebarOpen, modelSettings, onSettingsChange }) => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [streamingContent, setStreamingContent] = useState('');
-    const [selectedModel, setSelectedModel] = useState('smolvlm');
     const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
     const [isUploading, setIsUploading] = useState(false);
     const streamingContentRef = useRef('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    // Update WebSocket managers when model changes
+    useEffect(() => {
+        if (modelSettings.model) {
+            wsManager.setModelId(modelSettings.model);
+            wsVisionManager.setModelId(modelSettings.model);
+        }
+    }, [modelSettings.model]);
 
     // Add this function to scroll to bottom
     const scrollToBottom = () => {
@@ -194,8 +207,8 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
             // Check if this conversation has any images and select vision model if so
             const hasImages = data.some(message => message.image_url);
             if (hasImages) {
-                console.log("Conversation has images, setting model to 'smolvlm'");
-                setSelectedModel('smolvlm');
+                console.log("Conversation has images, using vision model");
+                // The model selection will be handled by the ModelSettings component
             }
         } catch (error) {
             console.error('Error fetching messages:', error);
@@ -213,8 +226,11 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
 
         // Switch to vision model when an image is selected
         if (file) {
-            console.log("Image selected, setting model to 'smolvlm'");
-            setSelectedModel('smolvlm');
+            console.log("Image selected, switching to vision model");
+            onSettingsChange({
+                ...modelSettings,
+                model: 'smolvlm'
+            });
         }
     };
 
@@ -273,6 +289,8 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
         // Set default content if only an image was provided
         const messageContent = content.trim() || "What can you tell me about this image?";
 
+        // Clear input field immediately and set loading state
+        setInput('');
         setIsLoading(true);
 
         try {
@@ -285,13 +303,30 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
                     Math.round(selectedImageFile.size / 1024), 'KB',
                     'type:', selectedImageFile.type);
 
-                // Upload the image first
+                // Create a temporary image URL for immediate display
+                const tempImageUrl = URL.createObjectURL(selectedImageFile);
+
+                // Add user message to chat immediately with temporary image
+                const userMessage: Message = {
+                    id: Date.now().toString(),
+                    content: messageContent,
+                    role: 'user',
+                    timestamp: new Date().toISOString(),
+                    image_url: tempImageUrl // Use temporary URL for immediate display
+                };
+                setMessages(prev => [...prev, userMessage]);
+                setStreamingContent('');
+                streamingContentRef.current = '';
+
+                // Upload the image
                 const uploadResult = await uploadImage(selectedImageFile, chatIdNumber);
 
                 if (!uploadResult) {
                     // Handle upload failure
                     setIsLoading(false);
                     alert('Failed to upload image. Please try again.');
+                    // Remove the temporary message or keep it with an error indicator
+                    setMessages(prev => prev.filter(msg => msg.id !== userMessage.id));
                     return;
                 }
 
@@ -300,21 +335,15 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
 
                 console.log('Image uploaded successfully:', imageUrl, 'conversationId:', actualChatId);
 
-                // Add user message to chat
-                const userMessage: Message = {
-                    id: Date.now().toString(),
-                    content: messageContent,
-                    role: 'user',
-                    timestamp: new Date().toISOString(),
-                    image_url: imageUrl
-                };
-                setMessages(prev => [...prev, userMessage]);
-                setInput('');
-                setStreamingContent('');
-                streamingContentRef.current = '';
+                // Update the message with the real image URL from server
+                setMessages(prev => prev.map(msg =>
+                    msg.id === userMessage.id
+                        ? { ...msg, image_url: imageUrl }
+                        : msg
+                ));
 
                 // Use vision-specific WebSocket - make sure we're passing just the filename
-                console.log("Using vision model:", selectedModel);
+                console.log("Using vision model:", modelSettings.model);
                 wsVisionManager.sendVisionChatMessage(
                     messageContent,
                     imageUrl, // This should just be the filename, not the full path
@@ -353,18 +382,24 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
                             });
                         }
 
+                        // Clean up the temporary URL
+                        URL.revokeObjectURL(tempImageUrl);
+
                         // Clear the uploaded image after processing
                         clearSelectedImage();
                     },
                     (error) => {
                         console.error('Vision WebSocket error:', error);
                         setIsLoading(false);
+
+                        // Clean up the temporary URL on error
+                        URL.revokeObjectURL(tempImageUrl);
                     },
                     actualChatId,
                     {
                         ...modelSettings,
                         max_length: 500, // Increase max length for vision responses
-                        model: selectedModel // Pass the selected model explicitly
+                        model: modelSettings.model // Pass the selected model explicitly
                     }
                 );
             } else {
@@ -377,11 +412,10 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
                     timestamp: new Date().toISOString()
                 };
                 setMessages(prev => [...prev, userMessage]);
-                setInput('');
                 setStreamingContent('');
                 streamingContentRef.current = '';
 
-                console.log('Sending regular chat message', content, chatIdNumber, modelSettings, selectedModel);
+                console.log('Sending regular chat message', content, chatIdNumber, modelSettings, modelSettings.model);
 
                 wsManager.sendChatMessage(
                     content,
@@ -420,7 +454,7 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
                     chatIdNumber,
                     {
                         ...modelSettings,
-                        model: selectedModel
+                        model: modelSettings.model
                     }
                 );
             }
@@ -498,7 +532,9 @@ export const Chat: React.FC<ChatProps> = ({ chatId, onConversationUpdate, isSide
                                             {message.image_url && (
                                                 <div className="mb-3">
                                                     <img
-                                                        src={`${API_BASE_URL.replace('/api', '')}/uploads/${message.image_url}`}
+                                                        src={message.image_url.startsWith('blob:')
+                                                            ? message.image_url
+                                                            : `${API_BASE_URL.replace('/api', '')}/uploads/${message.image_url}`}
                                                         alt="Uploaded image"
                                                         className="max-w-full max-h-60 rounded"
                                                         onError={(e) => {

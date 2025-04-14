@@ -70,6 +70,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
                         className="max-w-full max-h-48 rounded"
                     />
                     <button
+                        type="button"
                         onClick={clearImage}
                         className="absolute top-2 right-2 p-1 bg-gray-800 text-white rounded-full opacity-80 hover:opacity-100"
                         disabled={disabled}
@@ -81,6 +82,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
                 </div>
             ) : (
                 <button
+                    type="button"
                     onClick={triggerFileInput}
                     className="flex items-center justify-center p-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-md transition-colors"
                     disabled={disabled}

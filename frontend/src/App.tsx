@@ -58,6 +58,7 @@ function App() {
                         onConversationUpdate={updateConversations}
                         isSidebarOpen={isSidebarOpen}
                         modelSettings={modelSettings}
+                        onSettingsChange={setModelSettings}
                     />
                 </div>
             </div>

@@ -40,8 +40,9 @@ export function ModelSettings({ isOpen, onClose, settings, onSettingsChange }: M
                             className="w-full bg-[#40414F] text-white rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-600"
                         >
                             <option value="mygpt">MyGPT</option>
-                            <option value="gemma">Gemma</option>
+                            <option value="gemma-3-1b-it">Gemma</option>
                             <option value="qwen-instruct">Qwen</option>
+                            <option value="smolvlm">SmolVLM</option>
                         </select>
                     </div>
 
