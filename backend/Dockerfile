@@ -1,12 +1,6 @@
-# Use an official Python runtime as a parent image
 FROM python:3.9-slim
 # # Use PyTorch base image with CUDA support
 # FROM pytorch/pytorch:2.2.0-cuda12.1-cudnn8-runtime
-
-# Set environment variables
-# ENV PYTHONDONTWRITEBYTECODE=1
-# ENV PYTHONUNBUFFERED=1
-ENV MODEL_PATH=/app/models/gpt2-small-124M.pth
 
 # Set working directory
 WORKDIR /app
@@ -17,11 +11,10 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/* \
     && curl -LsSf https://astral.sh/uv/install.sh | sh \
-    && /root/.local/bin/uv --version \
     && ln -s /root/.local/bin/uv /usr/local/bin/uv
 
 # Create models directory
-RUN mkdir -p /app/models && chmod 777 /app/models
+RUN mkdir -p /app/models
 
 # Copy requirements file
 COPY requirements.txt .
@@ -30,7 +23,7 @@ COPY requirements.txt .
 RUN uv pip install --system --requirement requirements.txt
 
 # Copy source code
-COPY . .
+COPY . /app/
 
 # Create volume mount point for model weights and checkpoints
 VOLUME /app/models
@@ -43,4 +36,4 @@ EXPOSE 8000
 #     CMD curl -f http://localhost:8000/api/health || exit 1
 
 # Start the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"] 
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"] 

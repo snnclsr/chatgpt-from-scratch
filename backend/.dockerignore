@@ -1,0 +1,16 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+.venv
+*.db
+uploads/
+models/*.pth
+my_ml/*.pth
+.git
+.gitignore
+models/*
