@@ -6,7 +6,7 @@ import { Conversation, ModelSettings as ModelSettingsType } from './types';
 
 function App() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(true);
     const [currentChatId, setCurrentChatId] = useState<string | null>(null);
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [modelSettings, setModelSettings] = useState<ModelSettingsType>({

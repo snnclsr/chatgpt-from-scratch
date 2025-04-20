@@ -15,23 +15,26 @@ def download_and_load_gpt2(model_size, models_dir):
         raise ValueError(f"Model size not in {allowed_sizes}")
 
     # Define paths
-    # model_dir = os.path.join(models_dir, model_size)
-    model_dir = "/content/drive/MyDrive/kaggle/gpt2/355M"
-    # base_url = "https://openaipublic.blob.core.windows.net/gpt-2/models"
-    # backup_base_url = "https://f001.backblazeb2.com/file/LLMs-from-scratch/gpt2"
-    # filenames = [
-    #     "checkpoint", "encoder.json", "hparams.json",
-    #     "model.ckpt.data-00000-of-00001", "model.ckpt.index",
-    #     "model.ckpt.meta", "vocab.bpe"
-    # ]
+    model_dir = os.path.join(models_dir, model_size)
+    base_url = "https://openaipublic.blob.core.windows.net/gpt-2/models"
+    backup_base_url = "https://f001.backblazeb2.com/file/LLMs-from-scratch/gpt2"
+    filenames = [
+        "checkpoint",
+        "encoder.json",
+        "hparams.json",
+        "model.ckpt.data-00000-of-00001",
+        "model.ckpt.index",
+        "model.ckpt.meta",
+        "vocab.bpe",
+    ]
 
     # Download files
-    # os.makedirs(model_dir, exist_ok=True)
-    # for filename in filenames:
-    #     file_url = os.path.join(base_url, model_size, filename)
-    #     backup_url = os.path.join(backup_base_url, model_size, filename)
-    #     file_path = os.path.join(model_dir, filename)
-    #     download_file(file_url, file_path, backup_url)
+    os.makedirs(model_dir, exist_ok=True)
+    for filename in filenames:
+        file_url = os.path.join(base_url, model_size, filename)
+        backup_url = os.path.join(backup_base_url, model_size, filename)
+        file_path = os.path.join(model_dir, filename)
+        download_file(file_url, file_path, backup_url)
 
     # Load settings and params
     tf_ckpt_path = tf.train.latest_checkpoint(model_dir)
