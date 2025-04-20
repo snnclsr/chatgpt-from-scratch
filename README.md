@@ -68,14 +68,14 @@ docker run -p 3000:3000 chatgpt-frontend
 ``` -->
 
 ## 📚 Model Training
-The training procedure is under `modelling` directory building upon Sebastian Raschka's ["Build a Large Language Model (From Scratch)" book](https://github.com/rasbt/LLMs-from-scratch), implementing:
+The training procedure is under `modelling` directory building upon Sebastian Raschka's ["Build a Large Language Model (From Scratch)" book](https://github.com/rasbt/LLMs-from-scratch), adapted from [here](https://github.com/rasbt/LLMs-from-scratch/tree/main/ch07/01_main-chapter-code) and implementing:
 - Custom GPT model architecture
 - Instruction tuning using the Alpaca dataset
 
-To run the training
+To run the training:
+
 ```bash
-cd modelling
-python train.py --alpaca_data_path <path_to_alpaca_data>
+python -m modelling.train
 ```
 
 I also applied following changes to the training code/model to make training/inference faster (https://github.com/rasbt/LLMs-from-scratch/tree/main/ch05/10_llm-training-speed)

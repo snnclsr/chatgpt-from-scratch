@@ -13,3 +13,5 @@ transformers==4.50.3
 python-multipart==0.0.6
 Pillow==10.1.0
 requests>=2.31.0
+# matplotlib>=3.7.1 # For model training
+# tensorflow>=2.18.0 # For model training
