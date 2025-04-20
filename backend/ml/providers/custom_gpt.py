@@ -4,6 +4,16 @@ from ..base import BaseModelInterface
 from ...my_ml.model_interface import ModelInterface
 
 
+def format_input(prompt):
+    instruction_text = (
+        f"Below is an instruction that describes a task. "
+        f"Write a response that appropriately completes the request."
+        f"\n\n### Instruction:\n{prompt['instruction']}"
+    )
+    input_text = f"\n\n### Input:\n{prompt['input']}" if prompt["input"] else ""
+    return instruction_text + input_text
+
+
 class CustomGPTModel(BaseModelInterface):
     def __init__(self, model_name: str, model_config: Dict[str, Any]):
         self.model_name = model_name
@@ -21,18 +31,17 @@ class CustomGPTModel(BaseModelInterface):
         if not self.model_interface:
             await self.load_model()
 
-        prompt_str = ""
-        for message in prompt:
-            prompt_str += f"{message['role']}: {message['content']}\n"
-        print("Custom GPT Prompt: ", prompt_str)
+        # Convert user/assistant messages to the format expected by the model
+        formatted_prompt = format_input(prompt[0])
+        print("Custom GPT Prompt: ", formatted_prompt)
 
         async for token in self.model_interface.generate_stream(
-            prompt_str,
+            formatted_prompt,
             max_length=params.get("max_length", 100),
             temperature=params.get("temperature", 0.7),
             top_k=params.get("top_k", None),
             top_p=params.get("top_p", 0.9),
-            eos_id=params.get("eos_id", None),
+            eos_id=50256,  # params.get("eos_id", None),
         ):
             yield token
 

@@ -5,7 +5,7 @@ from typing import AsyncGenerator, Dict, Any
 
 import torch
 import tiktoken
-from .gpt_model import GPTModel
+from modelling.model import GPTModel
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -51,9 +51,9 @@ class ModelInterface:
                 "context_length": 1024,  # Context length
                 "drop_rate": 0.0,  # Dropout rate
                 "qkv_bias": True,  # Query-key-value bias
-                "emb_dim": 768,
-                "n_layers": 12,
-                "n_heads": 12,  # Using gpt2-small config directly
+                "emb_dim": 1024,
+                "n_layers": 24,
+                "n_heads": 16,  # Using gpt2-small config directly
             }
 
             # Use environment variable for model path with fallback to standard locations
@@ -79,7 +79,11 @@ class ModelInterface:
             logger.info(f"Loading model from: {model_path}")
 
             self.model = GPTModel(self.BASE_CONFIG)
-            self.model.load_state_dict(torch.load(model_path, weights_only=True))
+            self.model.load_state_dict(
+                torch.load(
+                    model_path, weights_only=True, map_location=torch.device("cpu")
+                )
+            )
             self.model = self.model.eval()
 
             # Check if Apple Silicon MPS is available
@@ -143,6 +147,9 @@ class ModelInterface:
 
             # Store original prompt length to track new tokens
             original_length = idx.shape[1]
+            prefix_buffer = ""
+            prefix_to_remove = "### Response:\n"
+            started_real_content = False
 
             # For-loop is the same as before: Get logits, and only focus on last time step
             for _ in range(max_length):
@@ -185,7 +192,22 @@ class ModelInterface:
 
                 # Decode just the new token and yield it
                 new_token = self.tokenizer.decode([idx_next.item()])
-                yield new_token
+                # If we haven't started generating real content yet, buffer the tokens
+                # and yield them when we see the prefix. This is to avoid generating
+                # the prefix itself (### Response:).
+                if not started_real_content:
+                    prefix_buffer += new_token
+                    if prefix_to_remove in prefix_buffer:
+                        started_real_content = True
+                        remaining = prefix_buffer.replace(prefix_to_remove, "").strip()
+                        if remaining:
+                            yield remaining
+                    elif len(prefix_buffer) > len(prefix_to_remove) + 6:
+                        started_real_content = True
+                        yield prefix_buffer.strip()
+                        prefix_buffer = ""
+                else:
+                    yield new_token
 
                 # Check if we hit the end token
                 if idx_next.item() == eos_id and eos_id is not None:

@@ -12,7 +12,9 @@ BASE_MODELS_DIR = os.environ.get(
 MODEL_CONFIGS: Dict[str, Dict[str, Any]] = {
     "mygpt": {
         "type": "custom_gpt",
-        "model_name": os.path.join(BASE_MODELS_DIR, "gpt2-small-124M.pth"),
+        "model_name": os.path.join(
+            BASE_MODELS_DIR, "gpt2-medium355M-sft-standalone.pth"
+        ),
         "generation_params": {
             "temperature": 0.7,
             "top_p": 0.9,
