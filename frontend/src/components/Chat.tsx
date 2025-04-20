@@ -100,13 +100,37 @@ const ChatInput = ({
                         </div>
                     )}
 
-                    <input
+                    {/* <input
                         type="text"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         className="flex-1 bg-transparent text-white placeholder-gray-400 focus:outline-none"
                         placeholder={"Type your message..."}
                         disabled={isLoading}
+                    /> */}
+                    <textarea
+                        value={input}
+                        onChange={(e) => {
+                            setInput(e.target.value);
+                            e.target.style.height = 'inherit';
+                            const maxHeight = 100; // Maximum height in pixels before scrolling
+                            const scrollHeight = e.target.scrollHeight;
+                            e.target.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.metaKey && !e.shiftKey) {
+                                // Submit on regular enter
+                                e.preventDefault();
+                                if (input.trim() || selectedImageFile) {
+                                    sendMessage(input);
+                                    setInput('');
+                                }
+                            }
+                        }}
+                        className="flex-1 bg-transparent text-white placeholder-gray-400 focus:outline-none resize-none min-h-[24px] max-h-[100px] overflow-y-auto leading-6 py-0"
+                        placeholder={"Type your message..."}
+                        disabled={isLoading}
+                        rows={1}
                     />
 
                     <button
