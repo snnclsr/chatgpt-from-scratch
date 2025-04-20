@@ -24,10 +24,13 @@ async def websocket_chat(websocket: WebSocket, model_id: str):
     client_id = await manager.connect(websocket)
     logger.info(f"Client connected with ID: {client_id}")
 
-    if model_id == "mygpt":
-        model = LLMService()
-    else:
+    try:
         model = await ModelFactory.get_model(model_id)
+    except Exception as e:
+        logger.error(f"Error getting model: {e}")
+        await manager.send_personal_message(client_id, {"error": str(e)})
+        return
+
     try:
         # Use context manager instead of manual DB session management
         with get_db_context() as db:
@@ -61,23 +64,24 @@ async def websocket_chat(websocket: WebSocket, model_id: str):
                     else:
                         # Title summarizer with Qwen
                         title = ""
-                        title_messages = [
-                            {
-                                "role": "system",
-                                "content": """You are a helpful assistant that summarizes conversations in less than 30 characters.""",
-                            },
-                            {
-                                "role": "user",
-                                "content": message.message,
-                            },
-                        ]
-                        async for token in model.generate_stream(
-                            prompt=title_messages,
-                            # max_length=250,
-                            max_new_tokens=40,
-                            temperature=0.3,
-                        ):
-                            title += token
+                        # title_messages = [
+                        #     {
+                        #         "role": "system",
+                        #         "content": """You are a helpful assistant that summarizes conversations in less than 30 characters.""",
+                        #     },
+                        #     {
+                        #         "role": "user",
+                        #         "content": message.message,
+                        #     },
+                        # ]
+                        # async for token in model.generate_stream(
+                        #     prompt=title_messages,
+                        #     # max_length=250,
+                        #     max_new_tokens=40,
+                        #     temperature=0.3,
+                        # ):
+                        #     title += token
+                        title = message.message[:35]
                         logger.info(f"Generated title: {title}")
                         # First message, create a new conversation
                         # title = message.message[:35]

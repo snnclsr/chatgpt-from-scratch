@@ -3,6 +3,7 @@ import logging
 from .base import BaseModelInterface, VisionModelInterface
 from .providers.huggingface import HuggingFaceModel
 from .providers.vision_huggingface import VisionHuggingFaceModel
+from .providers.custom_gpt import CustomGPTModel
 from .config import MODEL_CONFIGS
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,10 @@ class ModelFactory:
                 cls._models[model_id] = model
             elif model_type == "vision_huggingface":
                 model = VisionHuggingFaceModel(config["model_name"], config)
+                await model.load_model()
+                cls._models[model_id] = model
+            elif model_type == "custom_gpt":
+                model = CustomGPTModel(config["model_name"], config)
                 await model.load_model()
                 cls._models[model_id] = model
             else:

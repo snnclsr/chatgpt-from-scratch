@@ -24,10 +24,11 @@ def token_ids_to_text(token_ids, tokenizer):
 
 
 class ModelInterface:
-    def __init__(self):
+    def __init__(self, model_filename: str):
         """Initialize the model interface and load the model"""
         logger.info("Initializing model interface")
         # self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model_filename = model_filename
         self.device = torch.device(
             "mps" if torch.backends.mps.is_available() else "cpu"
         )
@@ -56,17 +57,16 @@ class ModelInterface:
             }
 
             # Use environment variable for model path with fallback to standard locations
-            model_filename = "gpt2-small-124M.pth"
             model_path = os.environ.get("MODEL_PATH")
 
             if not model_path:
                 # Check Docker models volume first (as per docker-compose.yml configuration)
                 models_dir = "/app/models"
-                docker_path = os.path.join(models_dir, model_filename)
+                docker_path = os.path.join(models_dir, self.model_filename)
 
                 # Check local directory as fallback
                 current_dir = os.path.dirname(os.path.abspath(__file__))
-                local_path = os.path.join(current_dir, model_filename)
+                local_path = os.path.join(current_dir, self.model_filename)
 
                 if os.path.exists(docker_path):
                     model_path = docker_path
@@ -74,7 +74,7 @@ class ModelInterface:
                     model_path = local_path
                 else:
                     # Last resort - just use the filename and hope it's in the current directory
-                    model_path = model_filename
+                    model_path = self.model_filename
 
             logger.info(f"Loading model from: {model_path}")
 
