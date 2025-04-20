@@ -8,7 +8,7 @@ def format_input(prompt):
     instruction_text = (
         f"Below is an instruction that describes a task. "
         f"Write a response that appropriately completes the request."
-        f"\n\n### Instruction:\n{prompt['instruction']}"
+        f"\n\n### Instruction:\n{prompt['content']}"
     )
     input_text = f"\n\n### Input:\n{prompt['input']}" if prompt["input"] else ""
     return instruction_text + input_text
@@ -30,11 +30,14 @@ class CustomGPTModel(BaseModelInterface):
     ) -> AsyncGenerator[str, None]:
         if not self.model_interface:
             await self.load_model()
+        single_prompt = prompt[0]
+        single_prompt["input"] = ""
+        if "Input" in single_prompt["content"]:
+            single_prompt["input"] = single_prompt["content"].split("Input:")[1].strip()
 
         # Convert user/assistant messages to the format expected by the model
-        formatted_prompt = format_input(prompt[0])
+        formatted_prompt = format_input(single_prompt)
         print("Custom GPT Prompt: ", formatted_prompt)
-
         async for token in self.model_interface.generate_stream(
             formatted_prompt,
             max_length=params.get("max_length", 100),
