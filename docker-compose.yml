@@ -22,6 +22,7 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app/backend
+      - ./modelling:/app/modelling
       - ml_models:/app/models
     environment:
       - ENV=development
