@@ -73,8 +73,9 @@ export function ModelSettings({ isOpen, onClose, settings, onSettingsChange }: M
                         </label>
                         <input
                             type="range"
-                            min="1"
-                            max="512"
+                            min="0"
+                            max="500"
+                            step="5"
                             value={settings.max_length}
                             onChange={(e) => onSettingsChange({
                                 ...settings,

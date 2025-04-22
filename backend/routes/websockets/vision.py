@@ -46,6 +46,7 @@ async def websocket_vision_chat(websocket: WebSocket, model_id: str):
     print(f"Model ID: {model_id}")
     print("Starting vision chat...")
 
+    # For testing, we can fake the token stream (faster while developing).
     async def fake_token_stream(tokens):
         for token in tokens:
             yield token
@@ -126,52 +127,26 @@ async def websocket_vision_chat(websocket: WebSocket, model_id: str):
                     # Stream the response using image and prompt
                     full_response = ""
                     print("Generating response...")
-                    # Fake lorem ipsum
-                    tokens = (
-                        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
-                        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
-                        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
-                        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
-                    )
-                    tokens = tokens.split(" ")
-                    print(f"Tokens: {tokens}")
-                    async for token in fake_token_stream(tokens):
-                        token = token + " "
-                        if token.startswith("Error:"):
-                            await manager.send_personal_message(
-                                client_id, {"error": token}
-                            )
-                            break
-
+                    async for token in model.generate_stream_with_image(
+                        request.message, image_path
+                    ):
                         full_response += token
-                        await manager.send_personal_message(client_id, {"token": token})
 
-                        # Check after each token if we should continue
-                        # This enables immediate cancellation
+                        # Check for stop command
                         if await manager.check_for_stop_command(client_id):
+                            logger.info("Vision generation stopped by client request")
                             stopped = True
                             break
 
-                    # async for token in model.generate_stream_with_image(
-                    #     request.message, image_path
-                    # ):
-                    #     full_response += token
-
-                    #     # Check for stop command
-                    #     if await manager.check_for_stop_command(client_id):
-                    #         logger.info("Vision generation stopped by client request")
-                    #         stopped = True
-                    #         break
-
-                    #     # Send token to the client
-                    #     await manager.send_personal_message(
-                    #         client_id,
-                    #         {
-                    #             "type": "token",
-                    #             "token": token,
-                    #             # "message_id": assistant_message.id,
-                    #         },
-                    #     )
+                        # Send token to the client
+                        await manager.send_personal_message(
+                            client_id,
+                            {
+                                "type": "token",
+                                "token": token,
+                                # "message_id": assistant_message.id,
+                            },
+                        )
 
                     # Generation completed successfully.
                     # If the generation was stopped, we don't store the response

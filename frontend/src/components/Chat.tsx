@@ -133,15 +133,30 @@ const ChatInput = ({
                         rows={1}
                     />
 
-                    <button
-                        type="submit"
-                        disabled={isLoading || (!input.trim() && !selectedImageFile)}
-                        className="p-1 rounded-lg text-gray-400 hover:bg-gray-600/30 hover:text-gray-200 disabled:hover:text-gray-400 transition-colors"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-                            <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
-                        </svg>
-                    </button>
+                    {isLoading ? (
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                stopGeneration();
+                            }}
+                            className="p-1 rounded-lg text-gray-400 hover:bg-gray-600/30 hover:text-gray-200 transition-colors"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+                                <path fillRule="evenodd" d="M4.5 7.5a3 3 0 013-3h9a3 3 0 013 3v9a3 3 0 01-3 3h-9a3 3 0 01-3-3v-9z" clipRule="evenodd" />
+                            </svg>
+                        </button>
+                    ) : (
+                        <button
+                            type="submit"
+                            disabled={isLoading || (!input.trim() && !selectedImageFile)}
+                            className="p-1 rounded-lg text-gray-400 hover:bg-gray-600/30 hover:text-gray-200 disabled:hover:text-gray-400 transition-colors"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
+                                <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+                            </svg>
+                        </button>
+                    )}
                 </div>
             </div>
         </form>
