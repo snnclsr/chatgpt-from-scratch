@@ -2,6 +2,8 @@
 
 A full-stack ChatGPT-like application built (almost) from scratch, featuring real-time conversation capabilities, multi-modal support, and a modern web interface. This project demonstrates the implementation of various components of a production-ready LLM application, from model training to deployment. 
 
+![](assets/ui.png)
+
 ## ✨ Features
 - 🤖 Multiple LLM Architecture Support
   - MyGPT (Instruction-tuned GPT2, details below)
